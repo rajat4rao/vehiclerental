@@ -1,5 +1,6 @@
 //React
 import { useNavigate } from 'react-router-dom';
+import errorCarImage from '../Images/ErrorCarImage.jpg';
 
 const Error = () => {
   const Navigate = useNavigate();
@@ -9,7 +10,7 @@ const Error = () => {
   };
 
   return (
-    <div className="bg-[url('../Images/ErrorCarImage.jpg')] bg-cover bg-center bg-no-repeat w-screen h-screen flex flex-col justify-center items-end text-white">
+    <div className=" bg-cover bg-center bg-no-repeat w-screen h-screen flex flex-col justify-center items-end text-white" style={{ backgroundImage: `url(${errorCarImage})` }}>
       <div className="bg-black/70 backdrop-blur-sm rounded-md border border-gray-300/30 p-6 mr-4 md:mr-8 lg:mr-12"> 
         <h1 className="text-3xl font-bold mb-4">Error 404 - Page Not Found</h1>
         <h4 className="text-xl font-semibold mb-2">Sorry, this page isn't available</h4>
