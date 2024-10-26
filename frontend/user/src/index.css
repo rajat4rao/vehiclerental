@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Dela+Gothic+One&family=Lobster&family=Luckiest+Guy&family=Monoton&family=Poppins&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+body,html
+{
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background-color: whitesmoke;
+
+}
+
+*
+{
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+  font-family: 'Poppins', sans-serif;
+
+}
+
