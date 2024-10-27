@@ -870,7 +870,7 @@ app.post("/Payment",authenticate,async(req,res)=>
   {
     const { paymentIntent } = req.body; 
     const { metadata, amount} = paymentIntent; 
-
+    const actualamount = amount/100;
     const startDate = metadata.carDetails.start_date;
     const dropDate = metadata.carDetails.drop_date;
 
@@ -887,7 +887,7 @@ app.post("/Payment",authenticate,async(req,res)=>
     const paymentHistory = new PaymentHistory({
         uid: metadata.uid,
         car_no:metadata.carDetails.car_no,
-        amount: amount/100, 
+        amount: actualamount, 
         currency: paymentIntent.currency,
         payment_intent_id: paymentIntent.id, 
 
@@ -925,7 +925,7 @@ app.post("/Payment",authenticate,async(req,res)=>
               <td>${sellerdetails.phone}</td>
               <td>${startdate}-${startmonth}-${startyear}</td>
               <td>${dropdate}-${dropmonth}-${dropyear}</td>
-              <td>&#8377;${amount}</td>
+              <td>&#8377;${actualamount}</td>
               </tr>
           </table>
 
@@ -963,7 +963,7 @@ app.post("/Payment",authenticate,async(req,res)=>
               <td>${userdetails.phone}</td>
               <td>${startdate}-${startmonth}-${startyear}</td>
               <td>${dropdate}-${dropmonth}-${dropyear}</td>
-              <td>&#8377;${amount}</td>
+              <td>&#8377;${actualamount}</td>
               </tr>
           </table>
 
@@ -984,7 +984,7 @@ app.post("/Payment",authenticate,async(req,res)=>
       {
           if(newdata.length==0 && bookeddata.length===0)
           {
-              await BookingModel.insertMany({sid:sid,uid:uid,car_no:car_no,start_date:startDate,drop_date:dropDate,amount:amount,payment_id:paymentId})
+              await BookingModel.insertMany({sid:sid,uid:uid,car_no:car_no,start_date:startDate,drop_date:dropDate,amount:actualamount,payment_id:paymentId})
 
                 transporter.sendMail(usermailOptions, function(error, info){
                   if (error) {
@@ -1013,7 +1013,7 @@ app.post("/Payment",authenticate,async(req,res)=>
       {
           if(!bookeddata.includes(car_no) && newdata.includes(car_no))
           {
-              await BookingModel.insertMany({sid:sid,uid:uid,car_no:car_no,start_date:startDate,drop_date:dropDate,amount:amount,payment_id:paymentId})
+              await BookingModel.insertMany({sid:sid,uid:uid,car_no:car_no,start_date:startDate,drop_date:dropDate,amount:actualamount,payment_id:paymentId})
 
                 transporter.sendMail(usermailOptions, function(error, info){
                   if (error) {
