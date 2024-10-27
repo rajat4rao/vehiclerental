@@ -52,11 +52,16 @@ Welcome to RentnRide, a comprehensive car rental platform designed for both user
 - **Customer Support:** Manage customer support inquiries through a dedicated interface.
 - **Vehicle Metadata Management:** Add, edit, and delete allowed fuel types, makes, models, and transmission types.  This provides control over the available options for hosts when listing cars.
 
-
 ## Demo
 
-[Link to live demo (if available)]
+- **Admin Panel:** [https://rentnride-admin.netlify.app/](https://rentnride-admin.netlify.app/)
+- **User Interface:** [https://rentnride-user.netlify.app/](https://rentnride-user.netlify.app/)
+- **Host Panel:** [https://rentnride-host.netlify.app/](https://rentnride-host.netlify.app/)
 
+
+## API Endpoints 
+
+- **Backend Base URL:** [https://vehiclerental-y81w.onrender.com](https://vehiclerental-y81w.onrender.com)
 
 ## Tech Stack
 
@@ -90,16 +95,6 @@ RentnRide/
 │ └── user/ (User Interface)
 └── backend/ (Shared backend or separate backend folders for admin, host, user)
 
-## Demo
-
-- **Admin Panel:** [https://rentnride-admin.netlify.app/](https://rentnride-admin.netlify.app/)
-- **User Interface:** [https://rentnride-user.netlify.app/](https://rentnride-user.netlify.app/)
-- **Host Panel:** [https://rentnride-host.netlify.app/](https://rentnride-host.netlify.app/)
-
-
-## API Endpoints 
-
-- **Backend Base URL:** [https://vehiclerental-y81w.onrender.com](https://vehiclerental-y81w.onrender.com)
 
 
 ## Usage
