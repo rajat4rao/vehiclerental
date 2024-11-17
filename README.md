@@ -54,7 +54,7 @@ Welcome to RentnRide, a comprehensive car rental platform designed for both user
 
 ## Demo
 
-- **Admin Panel:** [https://rentnride-admin.netlify.app/](https://rentnride-admin.netlify.app/)
+- **Admin Panel:** [https://rentnride-admin.netlify.app/](https://rentnride-admin.netlify.app/)   - Username: admin@mail.com Password : 123123
 - **User Interface:** [https://rentnride-user.netlify.app/](https://rentnride-user.netlify.app/)
 - **Host Panel:** [https://rentnride-host.netlify.app/](https://rentnride-host.netlify.app/)
 
@@ -72,7 +72,8 @@ Welcome to RentnRide, a comprehensive car rental platform designed for both user
 - **Vite:** Fast build tool.
 - **Tailwind CSS:** Utility-first CSS framework.
 - **Ant Design (antd):**  UI component library for React.
-- **Firebase Authentication & Storage:** User authentication and image storage.
+- **JWT Authentication:** Authentication.
+- **Multer Storage:** Image storage.
 - **React Router:** Navigation.
 - **Axios:** HTTP client for API communication.
 
