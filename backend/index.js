@@ -12,13 +12,16 @@ const app = express();
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true)
+            callback(null, {
+                origin: origin, 
+                credentials: true
+            });
         } else {
-            callback(new Error('Not allowed by CORS'))
+            callback(new Error('Not allowed by CORS'));
         }
     },
     credentials: true,
-  }))
+}));
 app.use(express.json());
 app.use(cookieParser()); 
 app.use('/uploads', express.static('uploads'));
