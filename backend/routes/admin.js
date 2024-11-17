@@ -112,6 +112,8 @@ app.post('/login', async (req, res) => {
         res.cookie('jwt', token, { 
           httpOnly: true,  
           maxAge: 360000000, 
+          sameSite: 'none',  
+          secure: true 
       });
         const response = {uid: user.uid}
         res.json(response);
