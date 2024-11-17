@@ -11,6 +11,8 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const app = express();
 app.use(cors({
     origin: function (origin, callback) {
+        console.log("origin",origin);
+        console.log(allowedOrigins);
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true)
         } else {
