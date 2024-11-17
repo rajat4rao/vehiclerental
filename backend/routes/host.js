@@ -110,7 +110,6 @@ function generateRandomAlphanumericSecure(length) {
         res.cookie('jwt', token, { 
           httpOnly: true,  
           maxAge: 360000000, 
-          domain: process.env.HOST_URL
       });
   
   

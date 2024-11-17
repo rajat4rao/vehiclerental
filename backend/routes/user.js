@@ -104,7 +104,6 @@ app.post('/login', async (req, res) => {
       res.cookie('jwt', token, { 
         httpOnly: true,  
         maxAge: 360000000, 
-        domain: process.env.USER_URL
     });
 
       const response = {uid: user.uid}
