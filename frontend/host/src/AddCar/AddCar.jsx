@@ -3,8 +3,8 @@ import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import axios from "../api/axios";
 
-import { storage1 } from "../UserConfig/firebase";
-import { ref, uploadBytes } from "firebase/storage";
+// import { storage1 } from "../UserConfig/firebase";
+// import { ref, uploadBytes } from "firebase/storage";
 
 import { ConfigProvider, notification } from "antd";
 
@@ -54,6 +54,7 @@ const AddCar = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const RcbookRef = useRef("");
   const InsuranceRef = useRef("");
+  const ImageRef = useRef("");
   const [Primaryfilename, SetPrimaryFileName] = useState({
     car: "No file chosen",
     rcbook: "No file chosen",
@@ -99,6 +100,25 @@ const AddCar = () => {
   };
 
   const ValidateForm = () => {
+
+    const formData = new FormData();
+    Object.entries(formdetails).forEach(([key, value]) =>
+      formData.append(key, value)
+    );
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      formData.append("extraImages", selectedFiles[i]);
+    }
+    
+
+    formData.append("rcbook", RcbookRef.current);
+    formData.append("insurance", InsuranceRef.current);
+    formData.append("img", ImageRef.current);
+
+    for (const [key, value] of formData.entries()) {
+      console.log(key, value);
+    }
+
     openNotification("Validating your details")
     if (formdetails.car_no.trim() === "" || formdetails.car_no == null) {
       SetErr((prev) => {
@@ -228,7 +248,7 @@ const AddCar = () => {
       });
       SetAck(false);
     }
-    if (formdetails.img === "" || formdetails.img === null) {
+    if (ImageRef.current === "" || ImageRef.current === null) {
       SetErr((prev) => {
         return { ...prev, img: "Choose your main car image" };
       });
@@ -287,8 +307,8 @@ const AddCar = () => {
     }
 
     if (
-      formdetails.img !== "" &&
-      formdetails.img !== null &&
+      ImageRef.current !== "" &&
+      ImageRef.current !== null &&
       selectedFiles.length > 0 &&
       RcbookRef.current !== "" &&
       RcbookRef.current !== null &&
@@ -316,20 +336,31 @@ const AddCar = () => {
       formdetails.location.trim() != "" &&
       formdetails.location != null
     ) {
-      CarFormSubmit();
+      CarFormSubmit(formData);
     } else {
       openNotification("Check fields again")
       return;
     }
   };
 
-  const CarFormSubmit = async () => {
+
+  const CarFormSubmittest = async (formData) => {
+   
+      const { data } = await axios.post("/AddCars", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data", // Important for multer
+        },
+      });
+
+  };
+
+  const CarFormSubmit = async (formData) => {
     if (
       formdetails.car_no.trim() != "" &&
       formdetails.car_no != null &&
       formdetails.car_no.length === 9 &&
-      formdetails.img != "" &&
-      formdetails.img != null &&
+      ImageRef.current != "" &&
+      ImageRef.current != null &&
       formdetails.name.trim() != "" &&
       formdetails.name != null &&
       formdetails.fuel != null &&
@@ -349,9 +380,16 @@ const AddCar = () => {
       formdetails.location.trim() != "" &&
       formdetails.location != null
     ) {
-      const { data } = await axios.post("/AddCars", formdetails);
+      const { data } = await axios.post("/AddCars", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data", // Important for multer
+        },
+      });
       if (data.action) {
-        ImagesUploadToFirebase();
+        openNotification("Successfully Registered");
+        setTimeout(() => {
+          Navigate("/Dashboard");
+        }, 3000);
       } else {
         openNotification(data.status);
       }
@@ -386,20 +424,7 @@ const AddCar = () => {
     }
   }, []);
 
-  const ConvertImage = (e) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(e.target.files[0]);
-
-    reader.onload = () => {
-      Setform((prev) => ({
-        ...prev,
-        img: reader.result,
-      }));
-    };
-    SetPrimaryFileName((prev) => {
-      return { ...prev, [e.target.name]: e.target.files[0].name };
-    });
-  };
+  
 
   function generateRandomName() {
     const uniqueId = Math.random().toString(36).substr(2, 9);
@@ -411,39 +436,39 @@ const AddCar = () => {
     return `${randomName}${fileExtension}`;
   }
 
-  const ImagesUploadToFirebase = async () => {
-    const insuranceRef = ref(
-      storage1,
-      `/CarImages/${user.sid}/${formdetails.car_no}/Insurance.jpg/`
-    );
+  // const ImagesUploadToFirebase = async () => {
+  //   const insuranceRef = ref(
+  //     storage1,
+  //     `/CarImages/${user.sid}/${formdetails.car_no}/Insurance.jpg/`
+  //   );
 
-    const rcbookRef = ref(
-      storage1,
-      `/CarImages/${user.sid}/${formdetails.car_no}/RCBook.jpg/`
-    );
+  //   const rcbookRef = ref(
+  //     storage1,
+  //     `/CarImages/${user.sid}/${formdetails.car_no}/RCBook.jpg/`
+  //   );
 
-    await uploadBytes(insuranceRef, InsuranceRef.current);
-    await uploadBytes(rcbookRef, RcbookRef.current);
+  //   await uploadBytes(insuranceRef, InsuranceRef.current);
+  //   await uploadBytes(rcbookRef, RcbookRef.current);
 
-    for (const file of selectedFiles) {
-      const randomname = generateRandomName();
-      const imageRef = ref(
-        storage1,
-        `/CarImages/${user.sid}/${formdetails.car_no}/images/${randomname}`
-      );
+  //   for (const file of selectedFiles) {
+  //     const randomname = generateRandomName();
+  //     const imageRef = ref(
+  //       storage1,
+  //       `/CarImages/${user.sid}/${formdetails.car_no}/images/${randomname}`
+  //     );
 
-      try {
-        await uploadBytes(imageRef, file);
-      } catch (error) {
-        openNotification("Error Try again");
-        return;
-      }
-    }
-    openNotification("Successfully Registered");
-    setTimeout(() => {
-      Navigate("/Dashboard");
-    }, 3000);
-  };
+  //     try {
+  //       await uploadBytes(imageRef, file);
+  //     } catch (error) {
+  //       openNotification("Error Try again");
+  //       return;
+  //     }
+  //   }
+  //   openNotification("Successfully Registered");
+  //   setTimeout(() => {
+  //     Navigate("/Dashboard");
+  //   }, 3000);
+  // };
 
   const handlecarimageChange = (e) => {
     const files = e.target.files;
@@ -467,6 +492,17 @@ const AddCar = () => {
           return { ...prev, [e.target.name]: e.target.files[0].name };
         });
       }
+    }
+  };
+
+  const ConvertImage = (e) => {
+    if (e && e.target && e.target.name) {
+      ImageRef.current = e.target.files[0];
+    }
+    if (e.target.files && e.target.files[0].name !== undefined) {
+      SetPrimaryFileName((prev) => {
+        return { ...prev, [e.target.name]: e.target.files[0].name };
+      });
     }
   };
 

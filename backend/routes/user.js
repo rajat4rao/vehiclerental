@@ -1,11 +1,17 @@
 const express = require('express');
 const app = express.Router();
+const fs = require("fs");
+const path = require("path");
 
 const {ExtendTripCars}=require('../Models/ExtendTripCars')
 const {findAvailableCars}=require("../Models/BookAvailableCars");
 const { FindListCars } = require('../Models/ListAvailableCars');
 const xlsx=require('xlsx')
 const bcrypt = require('bcrypt')
+const crypto = require('crypto');
+
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser'); 
 const {transporter}=require('../Mailer/Mail')
 
 const { UserModel } = require('../Models/UserModel');
@@ -19,7 +25,9 @@ const {DescriptionModel}=require('../Models/CarDescription')
 const {SellerModel}=require('../Models/SellerModel')
 const {PaymentHistory} = require('../Models/PaymentHistory'); 
 const {ContactMessage} = require('../Models/ContactMessage');
-const authenticate = require('../middleware/authenticate'); 
+const authenticateold = require('../middleware/authenticate'); 
+const authenticate = require('../middleware/authenticatejwt');
+const carUploadStorage = require('../middleware/multer'); 
 
 const firebase = require('../firebase');
 const { getAuth } = require('firebase-admin/auth');
@@ -28,12 +36,21 @@ const { start } = require('repl');
 const auth = getAuth(firebase);
 const PDFDocument = require('pdfkit');
 
-
 async function hashPassword(password) {
   const saltRounds = 10; 
   const salt = await bcrypt.genSalt(saltRounds);
   const hash = await bcrypt.hash(password, salt);
   return { salt, hash };
+}
+
+function generateRandomAlphanumericSecure(length) {
+  const bytes = crypto.randomBytes(length);
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters[bytes[i] % characters.length];
+  }
+  return result;
 }
 
 app.post("/CreateUser",async(req,res)=>
@@ -49,8 +66,8 @@ app.post("/CreateUser",async(req,res)=>
     else
     {
       const { salt, hash } = await hashPassword(password);
-      const acc = await auth.createUser({email,password});
-      const uid = acc.uid;
+      //const acc = await auth.createUser({email,password});
+      const uid = generateRandomAlphanumericSecure(30);
       await UserModel.insertMany({uid:String(uid),name:name.charAt(0).toUpperCase()+name.slice(1),email:email,password:hash,salt:salt,phone:phone,location:location.charAt(0).toUpperCase()+location.slice(1),gender:'',address:''})
       res.send({status:"Profile Created Successfully",action:true})  
     }
@@ -61,6 +78,61 @@ app.post("/CreateUser",async(req,res)=>
     res.send({status:"The email address you provided is already registered",action:false})
   }
 })
+
+async function checkPassword(password, storedHash) {
+  try {
+      const match = await bcrypt.compare(password, storedHash);
+      return match; 
+  } catch (error) {
+      console.error("Error comparing passwords:", error);
+      return false; 
+  }
+}
+
+app.post('/login', async (req, res) => { 
+  const { email, password } = req.body;  
+  const user=await UserModel.findOne({email:email}).select({password:1,email:1,uid:1})
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid Credentials' });
+  }
+  const passwordMatches = await checkPassword(password, user.password);
+
+  if (passwordMatches) {
+      const payload = { uid: user.uid, email: user.email, user:true };
+      const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+      res.cookie('jwt', token, { 
+        httpOnly: true,  
+        maxAge: 360000000, 
+        domain: process.env.USER_URL
+    });
+
+      const response = {uid: user.uid}
+      res.json(response);
+  } else {
+      res.status(401).json({ error: 'Invalid Credentials'});
+  }
+});
+
+app.post('/logout', authenticate, (req, res) => {
+  res.clearCookie('jwt', { 
+      httpOnly: true,  
+  });
+
+  res.sendStatus(200); 
+});
+
+app.get('/check-auth-status', authenticate, (req, res) => {  
+
+  if(req.user.user){
+    res.json({ isAuthenticated: true, user: req.user });  
+  } else {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+     
+});
+
+
 
 app.post("/findUser",authenticate,async(req,res)=>{
 
@@ -79,20 +151,87 @@ app.post("/findUser",authenticate,async(req,res)=>{
 
 app.post('/forgotPassword',async(req,res)=>
 {
-    const {Email,Password}=req.body
-    await UserModel.updateOne({email:Email},{$set:{password:Password}})
-    res.send({action:true})
+    try {
+      const {token,Password}=req.body
+      const decodedUid = Buffer.from(token, 'base64').toString('utf8');
+      const { salt, hash } = await hashPassword(Password);
+      console.log(decodedUid)
+      await UserModel.updateOne({uid:decodedUid},{$set:{password:hash, salt:salt}})
+      res.send({action:true})
+    } catch (error) {
+      console.log(error)
+      res.send({action:false})
+    }
+})
+
+
+app.post("/sendPasswordReset",async(req,res)=>{
+
+  const {email}=req.body
+  const {uid}=await UserModel.findOne({email:email}).select({uid:1});
+
+
+  const encodedUid = Buffer.from(uid).toString('base64')
+  .replace(/\+/g, '-')
+  .replace(/\//g, '_')
+  .replace(/=+$/, '');
+
+
+  var mailOptions = {
+      from: 'balprao@gmail.com',
+      to: email,
+      subject: 'Password Reset Request',
+      html: `
+        <div>
+          <h1>Dear Customer,</h1>
+          <p>Click the following link to reset your password</p>
+          ${process.env.USER_URL}/forgotPassword?token=${encodedUid},
+
+          <p>Best regards,<br>
+          RentnRide<br>
+          balprao@gmail.com<br>
+        </div>
+      `,
+  };
+
+  transporter.sendMail(mailOptions, function(error, info){
+      if (error) {
+        console.log(error);
+      } else {
+        console.log('Email sent: ' + info.response);
+      }
+  });
+
+  res.send({action:true})
 })
 
 app.get("/findCars",async(req,res)=>
 {
     const CarList = await CarModel.find({isverified:true});
-    res.send(CarList)
+    const ListofCarsWithImages = await Promise.all(
+      CarList.map(async (car) => {
+        const userDir = `uploads/${car.sid}/${car.car_no}`;
+        try {
+          const files = await fs.promises.readdir(userDir); 
+          const imageUrls = files
+            .filter((file) => file.startsWith("img"))
+            .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+          const extraimageUrls = files
+            .filter((file) => file.startsWith("extraImages"))
+            .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+          return { ...car._doc, imageUrls, extraimageUrls }; 
+        } catch (error) {
+          console.error("Error getting images for car:", car.car_no, error);
+          return { ...car._doc, imageUrls: [], extraimageUrls: [] };  
+        }
+      })
+    );
+    res.send(ListofCarsWithImages)
 })
 
 app.post("/findAvailableCars",async(req,res)=>
 {
-    const {uid,start_date,drop_date,status,Fuel,price,Model,Make,location,Type,ratings}=req.body
+    const {uid,start_date,drop_date,status,Fuel,price,Model,Make,Location,Type,ratings}=req.body
 
     var startdate=Number(start_date.split("-")[2]);
     var dropdate=Number(drop_date.split("-")[2]);
@@ -119,13 +258,32 @@ app.post("/findAvailableCars",async(req,res)=>
     if(status==="BookingDetails")
     {
         var ListofCars=await CarModel.find({car_no:newdata})
+        var ListofCarsWithImages = await Promise.all(
+          ListofCars.map(async (car) => {
+            const userDir = `uploads/${car.sid}/${car.car_no}`;
+            try {
+              const files = await fs.promises.readdir(userDir); 
+              const imageUrls = files
+                .filter((file) => file.startsWith("img"))
+                .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+              const extraimageUrls = files
+                .filter((file) => file.startsWith("extraImages"))
+                .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+
+              return { ...car._doc, imageUrls, extraimageUrls }; 
+            } catch (error) {
+              console.error("Error getting images for car:", car.car_no, error);
+              return { ...car._doc, imageUrls: [], extraimageUrls: [] };  
+            }
+          })
+        );
     } 
     else
     {
         var query = { car_no: { $in: newdata } };
 
-        if (location !== "") {
-            query.location = location;
+        if (Location && Location.length > 0) {
+            query.location = { $in: Location }; 
         }
 
         if (Model && Model.length > 0) {
@@ -160,11 +318,31 @@ app.post("/findAvailableCars",async(req,res)=>
         }
 
         var ListofCars = await CarModel.find(query);
+        var ListofCarsWithImages = await Promise.all(
+          ListofCars.map(async (car) => {
+            const userDir = `uploads/${car.sid}/${car.car_no}`;
+            try {
+              const files = await fs.promises.readdir(userDir); 
+              const imageUrls = files
+                .filter((file) => file.startsWith("img"))
+                .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+              const extraimageUrls = files
+                .filter((file) => file.startsWith("extraImages"))
+                .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+
+              return { ...car._doc, imageUrls, extraimageUrls }; 
+            } catch (error) {
+              console.error("Error getting images for car:", car.car_no, error);
+              return { ...car._doc, imageUrls: [], extraimageUrls: [] };  
+            }
+          })
+        );
+
     }
 
-    if(ListofCars.length>0) 
+    if(ListofCarsWithImages.length>0) 
     {
-        res.json(ListofCars) 
+        res.json(ListofCarsWithImages) 
     }
     else
     {
@@ -200,14 +378,44 @@ app.post("/findAvailableCars",async(req,res)=>
 app.get("/FiltersMetaData",async(req,res)=>{
 
     const FiltersMetaData=await CarMetaData.find({})
-    res.send(FiltersMetaData)
+    const Locations=await CarModel.find().select({location : 1})
+
+    const uniqueLocations = [...new Set(Locations.map(loc => loc.location))];
+
+    const locationObjects = uniqueLocations.map((location) => ({
+      value: location,  
+      label: location,  
+    }));
+
+const responseMetaData = JSON.parse(JSON.stringify(FiltersMetaData)); 
+
+if (responseMetaData.length > 0) {
+    responseMetaData[0].Location = locationObjects;
+} else {
+    responseMetaData.push({ Location: locationObjects }); 
+}
+
+    res.send(responseMetaData)
 })
 
 app.post("/findsinglecar",async(req,res)=>{
 
     const {car_no}=req.body;
     const cardetails= await CarModel.findOne({car_no})
-    res.send(cardetails)
+
+        const userDir = `uploads/${cardetails.sid}/${cardetails.car_no}`;
+
+        try {
+          const files = await fs.promises.readdir(userDir); 
+          const imageUrls = files
+            .filter((file) => file.startsWith("img"))
+            .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+            return res.send({...cardetails._doc, imageUrls})
+
+        } catch (error) {
+          return res.send({cardetails})
+        }
+
 })
 
 app.post("/findReviews",async(req,res)=>
@@ -254,132 +462,184 @@ app.post("/findReviews",async(req,res)=>
 app.post("/ActiveBookings",authenticate,async(req,res)=>{
 
     const {uid}=req.body;
+    try {
+      const bookings = await BookingModel.aggregate([
+          {
+            $match: {
+                  uid: uid
+          }
+        },
+          {
+            $lookup: {
+              from: 'sellerdetails',
+              localField: 'sid',
+              foreignField: 'sid',
+              as: 'sellerdetails',
+            },
+          },
 
-BookingModel.aggregate([
-  {
-    $match: {
-          uid: uid
-  }
-},
-  {
-    $lookup: {
-      from: 'sellerdetails',
-      localField: 'sid',
-      foreignField: 'sid',
-      as: 'sellerdetails',
-    },
-  },
+          {
+                $lookup: {
+                    from: "cardetails",
+                    localField: "car_no",
+                    foreignField: "car_no",
+                    as: "cardetails"
+                }
+        },
+        {
+            $unwind: "$cardetails"
+        },
+        {
+          $unwind: "$sellerdetails",
+        },
+        {
+          $project: {
+            _id: 1,
+            'bookingDetails.uid': '$$ROOT.uid',
+            'bookingDetails.car_no': '$$ROOT.car_no',
+            'bookingDetails.sid': '$$ROOT.sid',
+            'bookingDetails.start_date': '$$ROOT.start_date',
+            'bookingDetails.drop_date': '$$ROOT.drop_date',
+            'bookingDetails.amount': '$$ROOT.amount',
+            'sellerdetails.name': 1,
+            'sellerdetails.phone': 1,
+            'cardetails.name':1,
+            'cardetails.img':1,
+            'cardetails.fuel':1,
+            'cardetails.make':1,
+            'cardetails.model':1,
+            'cardetails.type':1,
+            'cardetails.location':1,
+            'cardetails.year':1,
+            'cardetails.price':1,
 
-  {
-        $lookup: {
-            from: "cardetails",
-            localField: "car_no",
-            foreignField: "car_no",
-            as: "cardetails"
-        }
-},
-{
-    $unwind: "$cardetails"
-},
-{
-    $unwind: "$sellerdetails",
-  },
-  {
-    $project: {
-      _id: 1,
-      'bookingDetails.uid': '$$ROOT.uid',
-      'bookingDetails.car_no': '$$ROOT.car_no',
-      'bookingDetails.sid': '$$ROOT.sid',
-      'bookingDetails.start_date': '$$ROOT.start_date',
-      'bookingDetails.drop_date': '$$ROOT.drop_date',
-      'bookingDetails.amount': '$$ROOT.amount',
-      'sellerdetails.name': 1,
-      'sellerdetails.phone': 1,
-      'cardetails.name':1,
-      'cardetails.img':1,
-      'cardetails.fuel':1,
-      'cardetails.make':1,
-      'cardetails.model':1,
-      'cardetails.type':1,
-      'cardetails.location':1,
-      'cardetails.year':1,
-      'cardetails.price':1,
+          },
+        },
+      ]);
 
-    },
-  },
-])
-  .then((result) => {
-      res.send(result)
-  })
-  .catch((error) => {
-    console.error(error);
-  });
+      const bookingsWithCarImages = await Promise.all(
+        bookings.map(async (booking) => {
+          const car = booking.bookingDetails; 
+          const userDir = `uploads/${car.sid}/${car.car_no}`;
+
+          try {
+            const files = await fs.promises.readdir(userDir); 
+            const imageUrls = files
+              .filter((file) => file.startsWith("img"))
+              .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+            const extraimageUrls = files
+              .filter((file) => file.startsWith("extraImages"))
+              .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+
+            return {
+              ...booking,
+              cardetails:{...booking.cardetails, imageUrls, extraimageUrls},  
+            };
+          } catch (error) {
+            console.error("Error getting images for car:", car.car_no, error);
+            return {
+              ...booking,
+              cardetails:{...booking.cardetails, imageUrls: [], extraimageUrls: []}, 
+            };
+          }
+        })
+      );
+      res.send(bookingsWithCarImages);
+    } catch(error) {
+      console.error(error);
+    }
 
 })  
 
 app.post("/PastBookings",authenticate,async(req,res)=>{
 
-const {uid}=req.body
+    const {uid}=req.body
+    try {
+      const bookings = await PastBookingModel.aggregate([
+        {
+            $match:{
+                uid:uid
+            }
+        },
+        {
+          $lookup: {
+            from: 'sellerdetails',
+            localField: 'sid',
+            foreignField: 'sid',
+            as: 'sellerdetails',
+          },
+        },
 
-PastBookingModel.aggregate([
-  {
-      $match:{
-          uid:uid
+        {
+              $lookup: {
+                  from: "cardetails",
+                  localField: "car_no",
+                  foreignField: "car_no",
+                  as: "cardetails"
+              }
+      },
+      {
+          $unwind: "$cardetails"
+      },
+      {
+          $unwind: "$sellerdetails",
+        },
+        {
+          $project:{
+              _id:1,
+              'bookingDetails.sid': '$$ROOT.sid',
+              'bookingDetails.car_no': '$$ROOT.car_no',
+              'bookingDetails.uid': '$$ROOT.uid',
+              'bookingDetails.start_date': '$$ROOT.start_date',
+              'bookingDetails.drop_date': '$$ROOT.drop_date',
+              'bookingDetails.amount': '$$ROOT.amount',
+              'sellerdetails.name': 1,
+              'sellerdetails.phone': 1,
+              'cardetails.name':1,
+              'cardetails.img':1,
+              'cardetails.fuel':1,
+              'cardetails.make':1,
+              'cardetails.model':1,
+              'cardetails.type':1,
+              'cardetails.location':1,
+              'cardetails.year':1,
+              'cardetails.price':1,
+          }
       }
-  },
-  {
-    $lookup: {
-      from: 'sellerdetails',
-      localField: 'sid',
-      foreignField: 'sid',
-      as: 'sellerdetails',
-    },
-  },
 
-  {
-        $lookup: {
-            from: "cardetails",
-            localField: "car_no",
-            foreignField: "car_no",
-            as: "cardetails"
+    ]);
+    const bookingsWithCarImages = await Promise.all(
+      bookings.map(async (booking) => {
+        const car = booking.bookingDetails; 
+        const userDir = `uploads/${car.sid}/${car.car_no}`;
+
+        try {
+          const files = await fs.promises.readdir(userDir); 
+          const imageUrls = files
+            .filter((file) => file.startsWith("img"))
+            .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+          const extraimageUrls = files
+            .filter((file) => file.startsWith("extraImages"))
+            .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+
+          return {
+            ...booking,
+            cardetails:{...booking.cardetails, imageUrls, extraimageUrls},  
+          };
+        } catch (error) {
+          console.error("Error getting images for car:", car.car_no, error);
+          return {
+            ...booking,
+            cardetails:{...booking.cardetails, imageUrls: [], extraimageUrls: []}, 
+          };
         }
-},
-{
-    $unwind: "$cardetails"
-},
-{
-    $unwind: "$sellerdetails",
-  },
-  {
-      $project:{
-          _id:1,
-          'bookingDetails.sid': '$$ROOT.sid',
-          'bookingDetails.car_no': '$$ROOT.car_no',
-          'bookingDetails.uid': '$$ROOT.uid',
-          'bookingDetails.start_date': '$$ROOT.start_date',
-          'bookingDetails.drop_date': '$$ROOT.drop_date',
-          'bookingDetails.amount': '$$ROOT.amount',
-          'sellerdetails.name': 1,
-          'sellerdetails.phone': 1,
-          'cardetails.name':1,
-          'cardetails.img':1,
-          'cardetails.fuel':1,
-          'cardetails.make':1,
-          'cardetails.model':1,
-          'cardetails.type':1,
-          'cardetails.location':1,
-          'cardetails.year':1,
-          'cardetails.price':1,
-      }
+      })
+    );
+    res.send(bookingsWithCarImages);
+  } catch (errror) {
+    console.error(error);
   }
 
-])
-.then(result => {
-  res.send(result)
-})
-.catch(error => {
-  res.send({status:"Error"})
-});
 })
 
 app.post("/EndTrip",authenticate,async(req,res)=>{
@@ -709,16 +969,28 @@ app.post('/findBookingsCount',authenticate,async(req,res)=>{
 
 })
 
-
-
   app.post('/findUserProfile',authenticate,async(req,res)=>{
     const {uid}=req.body
 
     const ProfileDetails=await UserModel.findOne({uid})
-    res.send(ProfileDetails)
+    let ProfileDetailsWithImages;
+    const userDir = `uploads/user_images/${uid}`;
+    try {
+      const files = await fs.promises.readdir(userDir); 
+      const imageUrls = files
+        .filter((file) => file.startsWith("img"))
+        .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+        ProfileDetailsWithImages = { ...ProfileDetails._doc, imageUrls}; 
+    } catch (error) {
+      console.error("Error getting images for car:", uid, error);
+      return { ...ProfileDetails._doc, imageUrls: [] };  
+    }
+
+    res.send(ProfileDetailsWithImages)
+
   })
 
-  app.post('/UpdateProfileDetails',authenticate,async(req,res)=>
+  app.post('/UpdateProfileDetails',authenticate,carUploadStorage,async(req,res)=>
   {
     const {uid,name,gender,email,phone,location,address}=req.body
     if(gender==='' && address==='')
@@ -1051,6 +1323,26 @@ app.post("/Payment",authenticate,async(req,res)=>
       console.error("Error fetching payment history:", error);
       res.status(500).json({ error: "Failed to fetch payment history" });
     }
+  });
+
+  app.post('/getCarImages',async (req, res) => {
+      const {sid, car_no} = req.body;
+      const userDir = `uploads/${sid}/${car_no}`;
+      try {
+        const files = await fs.promises.readdir(userDir); 
+
+        const imageUrls = files
+        .filter((file) => file.startsWith("img"))
+        .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+      const extraimageUrls = files
+        .filter((file) => file.startsWith("extraImages"))
+        .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+        const dataimages = imageUrls.concat(extraimageUrls);
+        res.send(dataimages)
+      } catch (error) {
+        console.log("Error getting images for car:", car.car_no, error);
+        return {};  
+      }      
   });
 
 app.post('/generate-invoice',authenticate, async(req, res) => {

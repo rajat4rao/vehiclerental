@@ -5,7 +5,11 @@ const firebase = require('../firebase');
 const { getAuth } = require('firebase-admin/auth');
 const { async } = require('@firebase/util');
 const auth = getAuth(firebase);
+const fs = require("fs");
+const path = require("path");
 
+const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken');
 const {CarModel} =require("../Models/CarModel")
 const {BookingModel}=require("../Models/BookingModel")
 const {PastBookingModel}=require("../Models/PastBookingModel");
@@ -15,12 +19,11 @@ const {ReviewModel} = require('../Models/ReviewModel');
 const {UserModel} = require('../Models/UserModel');
 const {ContactMessage} = require('../Models/ContactMessage');
 const {PaymentHistory} = require('../Models/PaymentHistory');
-const authenticate = require('../middleware/authenticate'); 
+const authenticateold = require('../middleware/authenticate'); 
+const authenticate = require('../middleware/authenticatejwt');
+const carUploadStorage = require('../middleware/multer'); 
 
 const {transporter}=require('../Mailer/Mail')
-
-
-
 
 app.get('/Dashboard',authenticate,async(req,res)=>
 {
@@ -61,8 +64,107 @@ app.get('/Dashboard',authenticate,async(req,res)=>
         },
     },
     ])
-    res.send(ListofCars)
+    const carsWithImages = await Promise.all(
+        ListofCars.map(async (car) => {
+          const userDir = `uploads/${car.sellerdetails.sid}/${car.cardetails.car_no}`;
+          try {
+            const files = await fs.promises.readdir(userDir); 
+            const imageUrls = files
+              .filter((file) => file.startsWith("img"))
+              .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+            const extraimageUrls = files
+              .filter((file) => file.startsWith("extraImages"))
+              .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+
+            return { ...car, imageUrls, extraimageUrls }; 
+          } catch (error) {
+            console.error("Error getting images for car:", car.car_no, error);
+            return { ...car, imageUrls: [], extraimageUrls: [] };  
+          }
+        })
+      );
+
+    res.send(carsWithImages)
 })
+
+async function checkPassword(password, storedHash) {
+    try {
+        const match = await bcrypt.compare(password, storedHash);
+        return match; 
+    } catch (error) {
+        console.error("Error comparing passwords:", error);
+        return false; 
+    }
+  }
+
+app.post('/login', async (req, res) => { 
+    const { email, password } = req.body;  
+    const user=await UserModel.findOne({email:"admin@mail.com"}).select({password:1,email:1,uid:1})
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid Credentials' });
+    }
+    const passwordMatches = await checkPassword(password, user.password);
+
+    if (passwordMatches) {
+        const payload = { uid: user.uid, email: user.email, admin:true };
+        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+        res.cookie('jwt', token, { 
+          httpOnly: true,  
+          maxAge: 360000000, 
+          domain: process.env.ADMIN_URL
+      });
+        const response = {uid: user.uid}
+        res.json(response);
+    } else {
+        res.status(401).json({ error: 'Invalid Credentials'});
+    }
+  });
+
+  app.post('/logout', authenticate, (req, res) => {
+    res.clearCookie('jwt', { 
+        httpOnly: true,  
+    });
+
+    res.sendStatus(200); 
+  });
+
+  app.get('/check-auth-status', authenticate, (req, res) => {  
+
+    res.json({ isAuthenticated: true, user: req.user });  
+  });
+
+app.post('/getCarImagesInsurance',async (req, res) => {
+    const {sid, car_no} = req.body;
+    const userDir = `uploads/${sid}/${car_no}`;
+    try {
+      const files = await fs.promises.readdir(userDir); 
+
+      const imgdata = files
+      .filter((file) => file.startsWith("insurance"))
+      .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);;
+      res.send({imgdata})
+    } catch (error) {
+      console.log("Error getting images for car:", car.car_no, error);
+      return {};  
+    }      
+});
+
+app.post('/getCarImagesRCBook',async (req, res) => {
+    const {sid, car_no} = req.body;
+    const userDir = `uploads/${sid}/${car_no}`;
+    try {
+      const files = await fs.promises.readdir(userDir); 
+
+      const imgdata = files
+      .filter((file) => file.startsWith("rcbook"))
+      .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);;
+      res.send({imgdata})
+    } catch (error) {
+      console.log("Error getting images for car:", car.car_no, error);
+      return {};  
+    }      
+});
 
 app.post('/VerifyCar',authenticate,async(req,res)=>
 {
@@ -122,6 +224,14 @@ app.post('/DeleteCar',authenticate,async(req,res)=>
     const sellerdetails=await SellerModel.findOne({sid:singlecar.sid}).select({email:1,name:1})
     const cardetails=await CarModel.findOne({car_no:singlecar.car_no}).select({name:1,make:1,car_no:1})
     await CarModel.deleteOne({car_no:singlecar.car_no,sid:singlecar.sid})
+
+    const userDir = `uploads/${singlecar.sid}/${singlecar.car_no}`;
+    try {
+        await fs.promises.rm(userDir, { recursive: true, force: true });
+        console.log("Directory deleted successfully:", userDir);
+    } catch (deleteError) {
+        console.error("Error deleting directory:", userDir, deleteError);
+    }
 
     var mailOptions = {
     from: 'balprao@gmail.com',
@@ -241,10 +351,10 @@ app.get('/rental-history',authenticate, async (req, res) => {
 app.get('/active-rentals',authenticate, async (req, res) => {
     try {
         const { page, pageSize } = req.query; 
-  
+
         const skip = (parseInt(page) - 1) * parseInt(pageSize);
         const limit = parseInt(pageSize);
-  
+
         const rentalHistory = await BookingModel.aggregate([
           { $lookup: { from: 'userdetails', localField: 'uid', foreignField: 'uid', as: 'userdetails' } },
           { $unwind: '$userdetails' },
@@ -252,14 +362,14 @@ app.get('/active-rentals',authenticate, async (req, res) => {
           { $unwind: '$cardetails' },
           { $lookup: { from: 'sellerdetails', localField: 'sid', foreignField: 'sid', as: 'sellerdetails' } },
           { $unwind: '$sellerdetails' },
-  
+
         ]).sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .exec();
-  
+
         const totalCount = await BookingModel.countDocuments({}); 
-  
+
         res.json({ rentalHistory, totalCount });
     } catch (error) {
         console.error("Error fetching rental history:", error);
@@ -416,7 +526,6 @@ app.get('/payment-history',authenticate, async (req, res) => {
 
         const pastpaymentsWithBookingDetails = await Promise.all(
             paymentsWithBookingDetails.map(async (payment) => {
-                console.log(payment);
                 const pastbooking = await PastBookingModel.findOne({ payment_id: payment._id })
                     .select('start_date drop_date uid sid') 
                     .lean() 
@@ -428,7 +537,6 @@ app.get('/payment-history',authenticate, async (req, res) => {
 
         const paymentDetailswithUsername = await Promise.all(
             pastpaymentsWithBookingDetails.map(async (payment) => {
-                console.log(payment._doc.uid);
                 const userdetails = await UserModel.findOne({ uid: payment._doc.uid })
                     .select('name email') 
                     .lean() 
@@ -459,8 +567,6 @@ app.get('/payment-history',authenticate, async (req, res) => {
               return newPayment;
             })
           );
-
-        console.log(fulldetails);
 
         const totalCount = await PaymentHistory.countDocuments();
         const totalPages = Math.ceil(totalCount / limit);

@@ -2,13 +2,13 @@ import { initializeApp } from "firebase/app";
 import { getStorage } from "firebase/storage";
 
 const SharedConfig = {
-  apiKey: "AIzaSyB55aWX02mZXjON7O2rSFtV7xGnYkXmh7E",
-  authDomain: "carrentalmanagement-ebec0.firebaseapp.com",
-  projectId: "carrentalmanagement-ebec0",
-  storageBucket: "carrentalmanagement-ebec0.appspot.com",
-  messagingSenderId: "846581571029",
-  appId: "1:846581571029:web:3c9464ab36da0aaa60f15c",
-  measurementId: "G-96DLX646TJ"
+  apiKey: import.meta.env.VITE_APP_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_APP_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_APP_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_APP_FIREBASE_MEASUREMENT_ID,
 };
 
 const app1 = initializeApp(SharedConfig,"CustomerSite");

@@ -3,6 +3,9 @@ import { useEffect, useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 
+import { CityData } from "../Profile/CityData";
+import { Gender } from "../Profile/CityData";
+
 import { FillCarNumber, Filldetails } from "../Slice/CarSLice";
 import {
   FillFilter,
@@ -16,7 +19,7 @@ import Navbar from "../Navbar/Navbar";
 import Footer from "../Home/Footer/Footer";
 import Loading from "../Loading/Loading";
 
-import { Slider, Rate, ConfigProvider, Input, Modal } from "antd";
+import { Select, Space, Slider, Rate, ConfigProvider, Input, Modal } from "antd";
 import { CalendarFilled } from "@ant-design/icons";
 
 import {
@@ -35,7 +38,7 @@ const Carlist = (props) => {
   const user = useSelector((state) => state.user);
   const [loading, Setloading] = useState(true);
   const [selectedCars, setSelectedCars] = useState({
-    location: false,
+    Location: [],
     Fuel: [],
     Make: [],
     Model: [],
@@ -57,11 +60,12 @@ const Carlist = (props) => {
   });
   const [Fuel, SetFuel] = useState([]);
   const [Make, SetMake] = useState([]);
+  const [Location, SetLocation] = useState([]);
   const [Model, SetModel] = useState([]);
   const [Type, SetType] = useState([]);
   const [isBook, SetBookAuth] = useState(false);
   const [FilterDetails, SetFilterDetails] = useState({
-    location: "",
+    Location: [],
     status: "FilterDetails",
     Fuel: [],
     Make: [],
@@ -100,6 +104,8 @@ const Carlist = (props) => {
     SetMake(data[0].Make);
     SetModel(data[0].Model);
     SetType(data[0].Type);
+    SetLocation(data[0].Location);
+
   };
 
   useEffect(() => {
@@ -157,21 +163,13 @@ const Carlist = (props) => {
   const FilterChange = (e, id) => {
     const { name, value } = e.target;
     const isChecked = e.target.checked;
-
+    console.log(name, id)
     setSelectedCars((prev) => {
       const updatedCars = { ...prev };
       if (isChecked) {
-        if (name !== "location") {
           updatedCars[name] = [...prev[name], id];
-        } else {
-          updatedCars.location = true;
-        }
       } else {
-        if (name !== "location") {
           updatedCars[name] = prev[name].filter((item) => item !== id);
-        } else {
-          updatedCars.location = false;
-        }
       }
       return updatedCars;
     });
@@ -179,18 +177,29 @@ const Carlist = (props) => {
     SetFilterDetails((prev) => {
       const updatedFilters = { ...prev };
       if (isChecked) {
-        if (name === "location") {
-          updatedFilters.location = user.location;
-        } else {
-          updatedFilters[name] = [...prev[name], value];
-        }
+          updatedFilters[name] = [...prev[name], value];       
       } else {
-        if (name === "location") {
-          updatedFilters.location = "";
-        } else {
-          updatedFilters[name] = prev[name].filter((item) => item !== value);
-        }
+          updatedFilters[name] = prev[name].filter((item) => item !== value);     
       }
+
+      return updatedFilters;
+    });
+  };
+
+  const LocationFilterChange = (e) => {
+    const name = e;
+    const value = e;
+    console.log(e)
+
+    setSelectedCars((prev) => {
+      prev['Location'] = e
+      const updatedCars = { ...prev };
+      return updatedCars;
+    });
+
+    SetFilterDetails((prev) => {
+      prev['Location'] = e
+      const updatedFilters = { ...prev };
       return updatedFilters;
     });
   };
@@ -209,7 +218,7 @@ const Carlist = (props) => {
         dispatch(FillFilterOut());
         Setpricevalue([200, 500]);
         setSelectedCars({
-          location: false,
+          Location: [],
           Fuel: [],
           Make: [],
           Model: [],
@@ -219,7 +228,7 @@ const Carlist = (props) => {
         SetArray(false);
         SetFetch(false);
         SetFilterDetails({
-          location: "",
+          Location: [],
           status: "FilterDetails",
           Fuel: [],
           Make: [],
@@ -240,7 +249,7 @@ const Carlist = (props) => {
     if (FetchCars) {
       ApplyFilter();
     } else {
-      alert("choose the dates");
+      alert("choose the dates and Find cars first");
     }
     SetFilterpopup(false);
   };
@@ -263,7 +272,7 @@ const Carlist = (props) => {
           SetAvailableCars(data);
           SetFetch(true);
           setSelectedCars({
-            location: false,
+            Location: [],
             Fuel: [],
             Make: [],
             Model: [],
@@ -272,7 +281,7 @@ const Carlist = (props) => {
           dispatch(FillSelectedCarsOut());
           dispatch(
             FillFilter({
-              location: "",
+              Location: [],
               Fuel: [],
               Make: [],
               Model: [],
@@ -282,7 +291,7 @@ const Carlist = (props) => {
             })
           );
           SetFilterDetails({
-            location: "",
+            Location: [],
             status: "FilterDetails",
             Fuel: [],
             Make: [],
@@ -315,14 +324,14 @@ const Carlist = (props) => {
   const ClearFilter = async () => {
     Setpricevalue([200, 500]);
     setSelectedCars({
-      location: false,
+      Location: [],
       Fuel: [],
       Make: [],
       Model: [],
       Type: [],
     });
     SetFilterDetails({
-      location: "",
+      Location: [],
       status: "FilterDetails",
       Fuel: [],
       Make: [],
@@ -384,7 +393,8 @@ const Carlist = (props) => {
         (car) =>
           car.name.match(value.trim()) ||
           car.make.match(value.trim()) ||
-          car.model.match(value.trim())
+          car.model.match(value.trim()) ||
+          car.location.match(value.trim())
       );
       if (value === "") {
         Setcars(AvailableCars);
@@ -425,8 +435,8 @@ const Carlist = (props) => {
 
   const ClearEachFilter = (fname) => {
     if (fname === "Location") {
-      SetFilterDetails((prev) => ({ ...prev, location: "" }));
-      setSelectedCars((prev) => ({ ...prev, location: false }));
+      SetFilterDetails((prev) => ({ ...prev, Location: [] }));
+      setSelectedCars((prev) => ({ ...prev, Location: [] }));
     } else if (fname === "Fuel") {
       SetFilterDetails((prev) => ({ ...prev, Fuel: [] }));
       setSelectedCars((prev) => ({ ...prev, Fuel: [] }));
@@ -502,26 +512,26 @@ const Carlist = (props) => {
               </div>
 
               {}
+
               <div>
-                <b className="block mb-2">My Location</b>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedCars.location}
-                    onChange={FilterChange} 
-                    name="location"
-                    value={user.location}
-                    id="location-checkbox"
-                    className="mr-2"
-                  />
-                  <label htmlFor="location-checkbox">{user.location}</label>
-                </div>
-                <button
-                  className="mt-2 text-sm text-blue-500"
-                  onClick={() => ClearEachFilter("Location")}
-                >
-                  Clear
-                </button>
+                <b className="block mb-2">Select Location</b>
+                <div className="flex items-center"></div>    
+                <Select
+                  mode="multiple"
+                  style={{
+                    width: '100%',
+                  }}
+                  placeholder="Select Locations"
+                  onChange={(e) => LocationFilterChange(e)}
+                  options={Location}
+                  optionRender={(option) => (
+                    <Space>
+                      <span role="img" aria-label={option.data.label}>
+                      </span>
+                      {option.data.value}
+                    </Space>
+                  )}
+                />
               </div>
 
               {}
@@ -771,7 +781,7 @@ const Carlist = (props) => {
                       <div className="bg-white rounded-lg shadow-md  hover:shadow-lg transition-shadow duration-300 flex flex-col h-full">
                         <div className="relative rounded-t-lg">
                           <img
-                            src={data.img}
+                            src={data.imageUrls}
                             alt="CarImage"
                             className="w-full h-48 rounded-t-lg object-cover"
                           />

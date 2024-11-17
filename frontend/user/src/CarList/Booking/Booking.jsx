@@ -21,8 +21,8 @@ import BookingBanner from "../BookingBanner/BookingBanner";
 import Amount from "../../Amount/Amount";
 
 //Firebase
-import { storage } from '../../config/firebase'
-import { getDownloadURL, listAll, ref } from "firebase/storage";
+// import { storage } from '../../config/firebase'
+// import { getDownloadURL, listAll, ref } from "firebase/storage";
 
 //Images
 import UserIcon from '../../Images//UserIcon/userIcon.png'
@@ -107,24 +107,8 @@ const Booking = (props) => {
     }
 
     const getCarImages = async (sid, car_no) => {
-        const imageRef = ref(
-            storage,
-            `/CarImages/${sid}/${car_no}/images/`
-        );
-        const imageList = await listAll(imageRef)
-
-        const downloadURLs = await Promise.all(
-            imageList.items.map(async (item) => {
-                try {
-                    const url = await getDownloadURL(item);
-                    return url;
-                } catch (error) {
-                    console.error('Error getting download URL:', error);
-                    return null;
-                }
-            })
-        );
-        SetCarImages(downloadURLs)
+        const { data } = await axios.post('/getCarImages', { car_no, sid })
+        SetCarImages(data)
     }
 
     useEffect(() => {

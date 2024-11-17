@@ -1,8 +1,8 @@
 //React
 import { Link, useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
-import { signOut } from "firebase/auth";
-import auth from "../Config/firebase";
+//import { signOut } from "firebase/auth";
+//import auth from "../Config/firebase";
 
 //Antd-Framework
 import { BarChartOutlined, LogoutOutlined, PlusSquareOutlined, HistoryOutlined, CommentOutlined, TeamOutlined, CustomerServiceOutlined } from '@ant-design/icons';
@@ -90,7 +90,6 @@ const Navbar = () => {
                     <button
                         onClick={() => {
                             sessionStorage.removeItem("userAuth");
-                            signOut(auth);
                             Navigate("/");
                         }}
                         className="flex items-center w-full py-2 px-4 mt-2 text-lg hover:bg-red-600 transition-colors duration-200 rounded-lg"

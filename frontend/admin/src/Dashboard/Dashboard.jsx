@@ -10,8 +10,8 @@ import { FuelIcon, GearIcon } from "../SVGIcons/SvgComponent";
 import Navbar from '../Navbar/Navbar'
 import Loading from '../Loading/Loading'
 
-import { storage } from '../Config/firebase'
-import { getDownloadURL, ref, listAll, deleteObject } from 'firebase/storage'
+// import { storage } from '../Config/firebase'
+// import { getDownloadURL, ref, listAll, deleteObject } from 'firebase/storage'
 
 const Dashboard = () => {
     const [loading, Setloading] = useState(true);
@@ -67,16 +67,14 @@ const Dashboard = () => {
     };
 
     const ShowInsurance = async (car_no, sid) => {
-        const imgref = ref(storage, `/CarImages/${sid}/${car_no}/Insurance.jpg`);
-        const imgdata = await getDownloadURL(imgref);
-        SetImage(imgdata);
+        const { data } = await axios.post('/getCarImagesInsurance', { car_no, sid });
+        SetImage(data.imgdata);
         SetInsurance(true);
     };
 
     const ShowRCBook = async (car_no, sid) => {
-        const imgref = ref(storage, `/CarImages/${sid}/${car_no}/RCBook.jpg`);
-        const imgdata = await getDownloadURL(imgref);
-        SetImage(imgdata);
+        const { data } = await axios.post('/getCarImagesRCBook', { car_no, sid });
+        SetImage(data.imgdata);
         SetRCBook(true);
     };
 
@@ -91,21 +89,21 @@ const Dashboard = () => {
         }
     };
 
-    async function deleteFolderContents(folderRef) {
-        try {
-            const folderRes = await listAll(folderRef);
-            folderRes.items.forEach((itemRef) => {
-                deleteObject(itemRef).catch((error) => {
-                    console.error('Error deleting item:', itemRef.fullPath, error);
-                });
-            });
-            folderRes.prefixes.forEach((prefixRef) => {
-                deleteFolderContents(prefixRef);
-            });
-        } catch (error) {
-            console.error("Error deleting folder contents:", error);
-        }
-    }
+    // async function deleteFolderContents(folderRef) {
+    //     try {
+    //         const folderRes = await listAll(folderRef);
+    //         folderRes.items.forEach((itemRef) => {
+    //             deleteObject(itemRef).catch((error) => {
+    //                 console.error('Error deleting item:', itemRef.fullPath, error);
+    //             });
+    //         });
+    //         folderRes.prefixes.forEach((prefixRef) => {
+    //             deleteFolderContents(prefixRef);
+    //         });
+    //     } catch (error) {
+    //         console.error("Error deleting folder contents:", error);
+    //     }
+    // }
 
     const Decline = async () => {
         if (Reason) {
@@ -114,8 +112,8 @@ const Dashboard = () => {
                 SetReasonPrompt(false);
                 Setloading(true);
                 getCarDetails();
-                const folderRef = ref(storage, `/CarImages/${singlecar.sid}/${singlecar.car_no}`);
-                deleteFolderContents(folderRef);
+                // const folderRef = ref(storage, `/CarImages/${singlecar.sid}/${singlecar.car_no}`);
+                // deleteFolderContents(folderRef);
             }
         } else {
             openNotification('Choose the Reason');
@@ -259,7 +257,7 @@ const Dashboard = () => {
                             <div key={data._id} className="bg-white rounded-lg shadow-md p-4 mb-4">
                                 <div className="flex">
                                     <div className="w-2/5 pr-4"> {}
-                                        <img src={data.cardetails.img} alt="CarImage" className="w-full h-auto rounded-lg shadow-md" />
+                                        <img src={data.imageUrls} alt="CarImage" className="w-full h-auto rounded-lg shadow-md" />
                                     </div>
 
                                     <div className="w-3/5">

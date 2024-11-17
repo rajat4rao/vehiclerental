@@ -13,10 +13,10 @@ import { useNavigate, Link } from "react-router-dom";
 import axios from "../api/axios";
 
 //Firebase
-import auth from "../config/firebase";
-import { storage } from "../config/firebase";
-import { signOut } from "firebase/auth";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+//import auth from "../config/firebase";
+//import { storage } from "../config/firebase";
+//import { signOut } from "firebase/auth";
+//import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 //Slice
 import { SignOutDetails } from "../Slice/userSlice";
@@ -46,7 +46,7 @@ const Profile = () => {
     (option?.label ?? "").toLowerCase().includes(input.toLowerCase());
 
   const Logout = () => {
-    signOut(auth);
+    //signOut(auth);
     dispatch(SignOutDetails());
     Navigate("/");
   };
@@ -60,12 +60,10 @@ const Profile = () => {
       location: data.location,
     });
     try {
-      const imageRef = ref(storage, "/images/" + `${user.sid}`);
-      const imgdata = await getDownloadURL(imageRef);
-      if (imgdata) {
-        Avatar.current.style.backgroundImage = `url(${imgdata})`;
+      if (data.imageUrls) {
+        Avatar.current.style.backgroundImage = `url(${data.imageUrls})`;
       }
-      SetImage(imgdata);
+      SetImage(data.imageUrls);
     } catch (error) {
       Avatar.current.style.backgroundImage = `url(https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTS1MqsgcnibLWsjdWTQPPmVC-oiDsErsX-1fcrz3MR_N38jc1IaP_dJXYONB0K-VYAmJE&usqp=CAU)`;
     }
@@ -105,15 +103,17 @@ const Profile = () => {
   };
 
   const AvatarChange = async (e) => {
-    let reader = new FileReader();
-    reader.readAsDataURL(e.target.files[0]);
-    reader.onload = () => {
-      Avatar.current.style.backgroundImage = `url(${reader.result})`;
-    };
+    // let reader = new FileReader();
+    // reader.readAsDataURL(e.target.files[0]);
+    // reader.onload = () => {
+    //   Avatar.current.style.backgroundImage = `url(${reader.result})`;
+    // };
     SetImage(e.target.files[0]);
   };
 
   const ValidateForm = () => {
+
+    
     if (ProfileDetails.phone === "" || ProfileDetails.phone === null) {
       SetErr((prev) => {
         return { ...prev, phone: "Enter your phone number" };
@@ -131,20 +131,35 @@ const Profile = () => {
       SetAck(false);
     }
 
+    const formData = new FormData();
+    Object.entries(ProfileDetails).forEach(([key, value]) =>
+      formData.append(key, value)
+    );
+    for (const pair of formData.entries()) {
+      console.log(pair[0]+ ', '+ pair[1]); 
+  }
+    if(image!='') {
+      formData.append("img", image);
+    }
+    formData.append("type", "profile_image");
     if (
       ProfileDetails.email !== "" &&
       ProfileDetails.email != null &&
       ProfileDetails.phone !== "" &&
       ProfileDetails.phone.length === 10
     ) {
-      UpdateProfileDetails();
+      UpdateProfileDetails(formData);
     }
   };
 
-  const UpdateProfileDetails = async () => {
-    const { data } = await axios.post("/UpdateProfileDetails", ProfileDetails);
-    const imageRef = ref(storage, `/images/${user.sid}`);
-    await uploadBytes(imageRef, image);
+  const UpdateProfileDetails = async (formData) => {
+    const { data } = await axios.post("/UpdateProfileDetails", formData,{
+      headers: {
+        "Content-Type": "multipart/form-data", // Important for multer
+      },
+    });
+    // const imageRef = ref(storage, `/images/${user.sid}`);
+    // await uploadBytes(imageRef, image);
 
     if (data.action) {
       await getUserDetails(user.sid);

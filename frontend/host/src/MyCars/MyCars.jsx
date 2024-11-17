@@ -18,8 +18,8 @@ import { Empty, Modal, ConfigProvider, notification, Avatar, Rate } from "antd";
 import { FuelIcon, GearIcon } from "../SVGIcons/SvgComponent";
 
 //Firebase
-import { storage1 } from '../UserConfig/firebase'
-import { ref, listAll, deleteObject } from "firebase/storage";
+// import { storage1 } from '../UserConfig/firebase'
+// import { ref, listAll, deleteObject } from "firebase/storage";
 
 const MyCars = () => {
     const user = useSelector((state) => state.user)
@@ -96,45 +96,28 @@ const MyCars = () => {
         }
     }
 
-    async function deleteFolderContents(folderRef) {
-        try {
-            const folderRes = await listAll(folderRef);
-            folderRes.items.forEach((itemRef) => {
-                deleteObject(itemRef).then(() => {
-                }).catch((error) => {
-                    console.error('Error deleting item:', itemRef.fullPath, error);
-                });
-            });
-            folderRes.prefixes.forEach((prefixRef) => {
-                deleteFolderContents(prefixRef);
-            });
-        } catch (error) {
-            console.error("Error deleting folder contents:", error);
-        }
-    }
+    // async function deleteFolderContents(folderRef) {
+    //     try {
+    //         const folderRes = await listAll(folderRef);
+    //         folderRes.items.forEach((itemRef) => {
+    //             deleteObject(itemRef).then(() => {
+    //             }).catch((error) => {
+    //                 console.error('Error deleting item:', itemRef.fullPath, error);
+    //             });
+    //         });
+    //         folderRes.prefixes.forEach((prefixRef) => {
+    //             deleteFolderContents(prefixRef);
+    //         });
+    //     } catch (error) {
+    //         console.error("Error deleting folder contents:", error);
+    //     }
+    // }
 
     const Delete = async () => {
         const { data } = await axios.delete("/DeleteCarDetail", {
             data: { car_no: singlecar.car_no }
         });
         if (data.action) {
-            const folderRef = ref(storage1, `/CarImages/${user.sid}/${singlecar.car_no}`);
-
-            listAll(folderRef)
-                .then((res) => {
-                    res.items.forEach((itemRef) => {
-                        deleteObject(itemRef).then(() => {
-                        }).catch((error) => {
-                            console.error('Error deleting item:', itemRef.fullPath, error);
-                        });
-                    });
-                    res.prefixes.forEach((prefixRef) => {
-                        deleteFolderContents(prefixRef);
-                    });
-                })
-                .catch((error) => {
-                    console.error('Error listing items:', error);
-                });
             openNotification(data.status)
             getCarDetails(user.sid)
         }
@@ -305,7 +288,7 @@ const MyCars = () => {
                                                     </div>
                                                     <div className="flex flex-row bg-white rounded-md shadow-md w-[75%] mx-auto py-3">
                                                         <div className="w-[40%] px-1">
-                                                            <img className="w-full max-h-full shadow-md" src={data.img} alt="CarImage" />
+                                                            <img className="w-full max-h-full shadow-md" src={data.imageUrls} alt="CarImage" />
                                                         </div>
                                                         <div className="w-[60%] ml-2">
                                                             <div className="px-3">

@@ -2,10 +2,11 @@
 import React from 'react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import axios from "../api/axios";
 
 //Firebase
-import auth from '../config/firebase'
-import { sendPasswordResetEmail } from 'firebase/auth';
+// import auth from '../config/firebase'
+// import { sendPasswordResetEmail } from 'firebase/auth';
 
 //Antd-Framework
 import {  notification,ConfigProvider } from 'antd';
@@ -34,11 +35,11 @@ const ForgotPassword=(props)=>
 
     const PasswordResetLink=async()=>
     {
-        await sendPasswordResetEmail(auth,Email,{url:currentURL}).then(()=>{
-        openNotification()
-        setTimeout(() => {
-            SetPasswordReset(false)
-        }, 2000);
+        await axios.post('/sendPasswordReset', { email:Email }).then(()=>{
+            openNotification()
+            setTimeout(() => {
+                SetPasswordReset(false)
+            }, 2000);
         })
         .catch((err)=>{console.log(err)})
     }

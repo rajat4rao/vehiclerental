@@ -2,16 +2,18 @@
 import { useState } from 'react'
 import axios from "../api/axios"
 import { useNavigate, useLocation } from 'react-router-dom'
+import {  notification,ConfigProvider } from 'antd';
 
 //Firebase
-import auth from '../config/firebase'
-import { confirmPasswordReset } from 'firebase/auth'
+// import auth from '../config/firebase'
+// import { confirmPasswordReset } from 'firebase/auth'
 
 
 const PasswordReset = () => {
     const [FormData, SetFormData] = useState({ Email: '', Password: '', ConfirmPassword: '' })
     const [Ack, SetAck] = useState(false)
     const [Errmsg, SetErrmsg] = useState({ Email: '', Password: '', ConfirmPassword: '' })
+    const [api, contextHolder] = notification.useNotification();
     const location = useLocation()
 
     const Navigate = useNavigate()
@@ -21,36 +23,39 @@ const PasswordReset = () => {
         SetFormData((prev) => { return ({ ...prev, [name]: value.trim() }) })
     }
 
-    const ResetPassword = async () => {
-        const { data } = await axios.post('/forgotPassword', FormData)
-        if (data.action) {
-            const query = new URLSearchParams(location.search)
-            const oobCode = query.get('oobCode')
-            await confirmPasswordReset(auth, oobCode, FormData.Password)
-            Navigate('/')
+    const openNotification = () => {
+        api.success({
+          message: `Password Changed`,
+          duration:2,
+          style: {
+              background:"#5cb85c	",
+            }
+        });
+      };
+
+    const ResetPassword=async()=>
+    {
+        const query=new URLSearchParams(location.search)
+        const token=query.get('token')
+        FormData.token = token
+        const {data}=await axios.post('/forgotPassword',FormData )
+        if(data.action)
+        {
+            openNotification()
+            setTimeout(() => {
+                Navigate('/')
+            }, 2000);
+            
+
         }
-        else {
+        else
+        {
             alert('Enter valid details')
         }
     }
 
     const ValidateForm=()=>
     {
-        if(FormData.Email==='')
-        {
-            SetErrmsg((prev)=>{return({...prev,Email:'Enter your Email'})})
-            SetAck(true)        
-        }
-        else if(!FormData.Email.includes('@gmail.com'))
-        {
-            SetErrmsg((prev)=>{return({...prev,Email:'Enter a valid email'})})
-            SetAck(true)
-        }
-        else 
-        {
-            SetErrmsg((prev)=>{return({...prev,Email:''})})
-            SetAck(false)
-        }
         
         if(FormData.Password==='')
         {
@@ -84,31 +89,18 @@ const PasswordReset = () => {
             SetAck(false)
         }
 
-        if(FormData.Email!=='' && FormData.Email.includes('@gmail.com') && FormData.Password!=="" && FormData.Password.length>=6 && FormData.ConfirmPassword!=="" && FormData.Password===FormData.ConfirmPassword)
+        if( FormData.Password!=="" && FormData.Password.length>=6 && FormData.ConfirmPassword!=="" && FormData.Password===FormData.ConfirmPassword)
         {
             ResetPassword()
         }
     }
 
     return (
-        <div className="w-full h-screen bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url(${require('../Images/ForgotImage.avif')})` }}>
+        <div className="w-full h-screen bg-cover bg-center bg-no-repeat" >
             <div className="w-full md:w-1/2 lg:w-1/3 h-[95%] mx-auto my-auto p-4 bg-white bg-opacity-85 backdrop-blur-md rounded-lg shadow-md border border-gray-300">
                 <h1 className="text-3xl font-bold text-center mb-4">Reset Password</h1>
                 <div className="p-4">
-                    <div className="mb-4">
-                        <label htmlFor="Email" className="block font-bold mb-2">Email Address:</label>
-                        <input
-                            type="email"
-                            id="Email"
-                            name="Email"
-                            onChange={FormChange}
-                            placeholder="Email Address"
-                            autoComplete="off"
-                            required
-                            className="w-full px-3 py-2 border border-gray-400 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        {Ack ? (<span className="text-red-500 block mt-1">{Errmsg.Email}</span>) : null}
-                    </div>
+
                     <div className="mb-4">
     <label htmlFor="Password" className="block font-bold mb-2">Password:</label>
     <input

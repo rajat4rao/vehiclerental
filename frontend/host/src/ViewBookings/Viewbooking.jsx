@@ -148,7 +148,7 @@ const ViewBooking = () => {
 
                                <div className="w-full md:w-3/5 flex flex-col">
                                 <div className="flex flex-col">
-                                        <img src={data.cardetails.img} alt="CarImage" className="w-full h-auto rounded-md shadow-md mb-4"/>
+                                        <img src={data.cardetails.imageUrls} alt="CarImage" className="w-full h-auto rounded-md shadow-md mb-4"/>
                                         <h2 className="text-xl font-bold uppercase mb-2">{data.cardetails.make} {data.cardetails.name} {data.cardetails.year}</h2>
 
                                         

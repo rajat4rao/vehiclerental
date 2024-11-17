@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from '../api/axios';
-import { storage } from '../Config/firebase';
-import { ref, uploadBytes } from "firebase/storage";
+// import { storage } from '../Config/firebase';
+// import { ref, uploadBytes } from "firebase/storage";
 import Navbar from "../Navbar/Navbar";
 import { ConfigProvider, notification } from 'antd';
 
@@ -69,17 +69,17 @@ const Add = () => {
         SetFilename(selectedFile.name);
     };
 
-    const Upload = async () => {
-        if (!image) {
-            openNotification('Choose your file');
-        } else {
-            const imgRef = ref(storage, '/MapLocation/' + image.name);
-            await uploadBytes(imgRef, image);
-            SetImage(null);
-            SetFilename('No file chosen');
-            openNotification('File Uploaded'); 
-        }
-    };
+    // const Upload = async () => {
+    //     if (!image) {
+    //         openNotification('Choose your file');
+    //     } else {
+    //         const imgRef = ref(storage, '/MapLocation/' + image.name);
+    //         await uploadBytes(imgRef, image);
+    //         SetImage(null);
+    //         SetFilename('No file chosen');
+    //         openNotification('File Uploaded'); 
+    //     }
+    // };
 
     const commonSelectStyles = "w-3/4 ml-1 mt-1 border-2 border-gray-400 bg-white rounded-sm p-2 text-gray-800";
     const commonInputStyles = "w-full ml-1 mt-1 border-2 border-gray-400 bg-white rounded-sm p-2 text-gray-800";

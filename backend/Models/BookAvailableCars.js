@@ -107,7 +107,6 @@ const findAvailableCars=async(bookingDetails,props)=>
 
             if(!newdata.includes(bookingDetails[i].car_no) && !bookeddata.includes(bookingDetails[i].car_no))
             {
-                console.log('came')
                 await FindListCars(newdata,bookeddata,bookingDetails[i],{startdate,dropdate,startmonth,dropmonth,startyear,dropyear},"BookedChecking")
                 flag=0;
                 // newdata.push(bookingDetails[i].car_no)

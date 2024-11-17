@@ -7,7 +7,20 @@ const { getAuth } = require('firebase-admin/auth');
 const { async } = require('@firebase/util');
 const auth = getAuth(firebase);
 const bcrypt = require('bcrypt')
+const crypto = require('crypto');
+
+const jwt = require('jsonwebtoken');
+const multer = require("multer");
 const { start } = require('repl');
+const fs = require("fs");
+const path = require("path");
+
+const util = require('util');  
+const rmdirAsync = util.promisify(fs.rm);
+const unlinkAsync = util.promisify(fs.unlink);
+app.use(express.urlencoded({ extended: true })); // For URL-encoded forms
+
+require('dotenv').config();
 
 //Models
 const {CarModel} =require("../Models/CarModel")
@@ -18,7 +31,9 @@ const { CarMetaData } = require('../Models/CarMetaData');
 const { ReviewModel } = require('../Models/ReviewModel');
 const {UserModel}=require('../Models/UserModel')
 const {DescriptionModel}=require('../Models/CarDescription')
-const authenticate = require('../middleware/authenticate'); 
+const authenticateold = require('../middleware/authenticate'); 
+const authenticate = require('../middleware/authenticatejwt');
+const carUploadStorage = require('../middleware/multer'); 
 
 //Functions
 const xlsx=require('xlsx');
@@ -29,6 +44,16 @@ async function hashPassword(password) {
   const salt = await bcrypt.genSalt(saltRounds);
   const hash = await bcrypt.hash(password, salt);
   return { salt, hash };
+}
+
+function generateRandomAlphanumericSecure(length) {
+  const bytes = crypto.randomBytes(length);
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters[bytes[i] % characters.length];
+  }
+  return result;
 }
 
 //Create New user
@@ -46,8 +71,8 @@ async function hashPassword(password) {
       else
       {
         const { salt, hash } = await hashPassword(password);
-        const acc = await auth.createUser({email,password});
-        const sid = acc.uid;
+        //const acc = await auth.createUser({email,password});
+        const sid = generateRandomAlphanumericSecure(30);
         await SellerModel.insertMany({sid:String(sid),name:name.charAt(0).toUpperCase()+name.slice(1),email:email,password:hash,salt:salt,phone:phone,location:location.charAt(0).toUpperCase()+location.slice(1),gender:'',address:''})
         res.send({status:"Profile Created Successfully",action:true})  
       }
@@ -57,6 +82,54 @@ async function hashPassword(password) {
       res.send({status:"The email address you provided is already registered",action:false})
     }
   })
+
+
+  async function checkPassword(password, storedHash) {
+    try {
+        const match = await bcrypt.compare(password, storedHash);
+        return match; 
+    } catch (error) {
+        console.error("Error comparing passwords:", error);
+        return false; 
+    }
+  }
+  
+  app.post('/login', async (req, res) => { 
+    const { email, password } = req.body;  
+    const user=await SellerModel.findOne({email:email}).select({password:1,email:1,sid:1})
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid Credentials' });
+    }
+    const passwordMatches = await checkPassword(password, user.password);
+  
+    if (passwordMatches) {
+        const payload = { sid: user.sid, email: user.email, host:true };
+        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+  
+  
+        res.cookie('jwt', token, { 
+          httpOnly: true,  
+          maxAge: 360000000, 
+          domain: process.env.HOST_URL
+      });
+  
+  
+        const response = {sid: user.sid}
+        res.json(response);
+    } else {
+        res.status(401).json({ error: 'Invalid Credentials'});
+    }
+  });
+
+
+  app.get('/check-auth-status', authenticate, (req, res) => {  // Using the auth middleware
+    if(req.user.host){
+      res.json({ isAuthenticated: true, user: req.user });  
+    } else {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+  });
+  
 
 
 // Login
@@ -74,72 +147,151 @@ app.post("/findUser",authenticate,async(req,res)=>{
 })
 
 //Add cars
-app.post("/AddCars",authenticate,async(req,res)=>
+app.post("/AddCars",authenticate,carUploadStorage,async(req,res)=>
 {
+  
     const { sid,car_no,img,name,year,fuel,make,model,type,price,location,desc}=req.body
     const data=await CarModel.find({car_no})
     if(data.length>0)
     {
+      const userDir = `uploads/${sid}/${car_no}`;
+        try {
+          const uploadedFilenames = req.uploadedFilenames;
+          if (uploadedFilenames && uploadedFilenames.length > 0) {
+            await Promise.all(
+                uploadedFilenames.map(async (filename) => {
+                    const filePath = path.join(userDir, filename);
+                    try {
+                        await unlinkAsync(filePath);
+                        console.log("File deleted successfully:", filePath);
+                    } catch (fileDeleteError) {
+                        console.error("Error deleting file:", filePath, fileDeleteError);
+                        // Handle individual file deletion errors, perhaps log them
+                    }
+                })
+            );
+          }
+        } catch (deleteError) {
+          console.error("Error deleting directory and files:", deleteError);
+          // Handle the error appropriately, maybe send an error response but don't block the main response.
+        }
       res.send({status:"Car already registered",action:false})
     }
     else
     {
-      await CarModel.insertMany({sid:sid,car_no:car_no,img:img,name:name.charAt(0).toUpperCase()+name.slice(1),year:year,fuel:fuel,make:make.charAt(0).toUpperCase()+make.slice(1),model:model.charAt(0).toUpperCase()+model.slice(1),type:type.charAt(0).toUpperCase()+type.slice(1),price:price,ratings:"0",location:location.charAt(0).toUpperCase()+location.slice(1),list_start:"--",list_drop:"--",isverified:false})
+      await CarModel.insertMany({sid:sid,car_no:car_no,img:"none",name:name.charAt(0).toUpperCase()+name.slice(1),year:year,fuel:fuel,make:make.charAt(0).toUpperCase()+make.slice(1),model:model.charAt(0).toUpperCase()+model.slice(1),type:type.charAt(0).toUpperCase()+type.slice(1),price:price,ratings:"0",location:location.charAt(0).toUpperCase()+location.slice(1),list_start:"--",list_drop:"--",isverified:false})
       await DescriptionModel.insertMany({car_no:car_no,description:desc})
       res.send({status:"Successfully registered",action:true})
     }
 })
 
 //VerifiedCars
-app.post("/VerifiedCars", authenticate,async (req, res) => {
-    const { sid } = req.body;
-    CarModel.aggregate([
-      {
-        $match:{
-          $and:[
-            {
-              sid:sid
-            },
-            {
-              isverified:true
-            }
-          ]
-        }
-      },
-    ])
-      .then((result) => {
-        res.send(result)
-    })
-    .catch((error) => {
-      console.error(error);
-    });
+app.post("/VerifiedCars", authenticate, async (req, res) => {
+  const { sid } = req.body;
 
+  try {
+    const result = await CarModel.aggregate([
+      {
+        $match: {
+          $and: [{ sid: sid }, { isverified: true }],
+        },
+      },
+    ]);
+
+    const carsWithImages = await Promise.all(
+      result.map(async (car) => {
+        const userDir = `uploads/${car.sid}/${car.car_no}`;
+        try {
+          const files = await fs.promises.readdir(userDir); // Key change: await here
+          const imageUrls = files
+            .filter((file) => file.startsWith("img"))
+            .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+          const extraimageUrls = files
+            .filter((file) => file.startsWith("extraImages"))
+            .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+          return { ...car, imageUrls, extraimageUrls }; // Use ...car._doc if needed
+        } catch (error) {
+          console.error("Error getting images for car:", car.car_no, error);
+          return { ...car, imageUrls: [], extraimageUrls: [] };  // Provide extraimageUrls in error case
+        }
+      })
+    );
+
+    res.send(carsWithImages);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ error: "An error occurred" });
+  }
 });
 
 //UnVerifiedCars
-app.post("/UnVerifiedCars", authenticate,async (req, res) => {
-  const { sid } = req.body;
-  CarModel.aggregate([
-    {
-      $match:{
-        $and:[
-          {
-            sid:sid
-          },
-          {
-            isverified:false
-          }
-        ]
-      }
-    },
-  ])
-    .then((result) => {
-      res.send(result)
-  })
-  .catch((error) => {
-    console.error(error);
-  });
+// app.post("/UnVerifiedCars", authenticate,async (req, res) => {
+//   const { sid } = req.body;
+//   CarModel.aggregate([
+//     {
+//       $match:{
+//         $and:[
+//           {
+//             sid:sid
+//           },
+//           {
+//             isverified:false
+//           }
+//         ]
+//       }
+//     },
+//   ])
+//     .then((result) => {
+//       res.send(result)
+//   })
+//   .catch((error) => {
+//     console.error(error);
+//   });
 
+// });
+
+
+
+
+app.post("/UnVerifiedCars", authenticate, async (req, res) => {
+  const { sid } = req.body;
+
+  try {
+    const cars = await CarModel.aggregate([
+      {
+        $match: {
+          $and: [
+            { sid: sid },
+            { isverified: false },
+          ],
+        },
+      },
+    ]);
+
+    const carsWithImages = await Promise.all(
+      cars.map(async (car) => {
+        const userDir = `uploads/${car.sid}/${car.car_no}`;
+        try {
+          const files = fs.readdirSync(userDir);
+          const imageUrls = files
+            .filter((file) => file.startsWith("img"))
+            .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+          const extraimageUrls = files
+          .filter((file) => file.startsWith("extraImages"))
+          .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);  
+          return { ...car, imageUrls, extraimageUrls };
+        } catch (error) {
+          console.error("Error getting images for car:", car.car_no, error);
+          return { ...car, imageUrls: [] }; // Or a default image URL
+        }
+      })
+    );
+
+    res.send(carsWithImages);
+  } catch (error) {
+    console.error("Error fetching unverified cars:", error);
+    res.status(500).send({ error: "Failed to fetch cars" });
+  }
 });
 
 //EditCarDetails
@@ -182,131 +334,182 @@ else
 //ActiveBookings
 app.post("/ActiveBookings",authenticate,async(req,res)=>{
   const {sid}=req.body;
-BookingModel.aggregate([
-{
-  $match: {
-  sid: sid
-  }
-},
-{
-  $lookup: {
-    from: 'userdetails',
-    localField: 'uid',
-    foreignField: 'uid',
-    as: 'userdetails',
+  try {
+  const bookings = await BookingModel.aggregate([
+  {
+    $match: {
+    sid: sid
+    }
   },
-},
+  {
+    $lookup: {
+      from: 'userdetails',
+      localField: 'uid',
+      foreignField: 'uid',
+      as: 'userdetails',
+    },
+  },
 
-{
-  $lookup: {
-      from: "cardetails",
-      localField: "car_no",
-      foreignField: "car_no",
-      as: "cardetails"
-  }
-},
-{
-  $unwind: "$cardetails"
-},
-{
-  $unwind: "$userdetails",
-},
-{
-  $project: {
-    _id: 1,
-    'bookingDetails.sid': '$$ROOT.sid',
-    'bookingDetails.uid': '$$ROOT.uid',
-    'bookingDetails.car_no': '$$ROOT.car_no',
-    'bookingDetails.sid': '$$ROOT.sid',
-    'bookingDetails.start_date': '$$ROOT.start_date',
-    'bookingDetails.drop_date': '$$ROOT.drop_date',
-    'bookingDetails.amount': '$$ROOT.amount',
-    'userdetails.name': 1,
-    'userdetails.phone': 1,
-    'cardetails.name':1,
-    'cardetails.img':1,
-    'cardetails.fuel':1,
-    'cardetails.make':1,
-    'cardetails.model':1,
-    'cardetails.type':1,
-    'cardetails.location':1,
-    'cardetails.year':1,
-    'cardetails.price':1,
+  {
+    $lookup: {
+        from: "cardetails",
+        localField: "car_no",
+        foreignField: "car_no",
+        as: "cardetails"
+    }
   },
-},
-])
-.then((result) => {
-    res.send(result)
+  {
+    $unwind: "$cardetails"
+  },
+  {
+    $unwind: "$userdetails",
+  },
+  {
+    $project: {
+      _id: 1,
+      'bookingDetails.sid': '$$ROOT.sid',
+      'bookingDetails.uid': '$$ROOT.uid',
+      'bookingDetails.car_no': '$$ROOT.car_no',
+      'bookingDetails.sid': '$$ROOT.sid',
+      'bookingDetails.start_date': '$$ROOT.start_date',
+      'bookingDetails.drop_date': '$$ROOT.drop_date',
+      'bookingDetails.amount': '$$ROOT.amount',
+      'userdetails.name': 1,
+      'userdetails.phone': 1,
+      'cardetails.name':1,
+      'cardetails.img':1,
+      'cardetails.fuel':1,
+      'cardetails.make':1,
+      'cardetails.model':1,
+      'cardetails.type':1,
+      'cardetails.location':1,
+      'cardetails.year':1,
+      'cardetails.price':1,
+    },
+  },
+  ]).exec();
+  const bookingsWithCarImages = await Promise.all(
+    bookings.map(async (booking) => {
+      const car = booking.bookingDetails; // Access the car details from the booking
+      const userDir = `uploads/${car.sid}/${car.car_no}`;
+
+      try {
+        const files = await fs.promises.readdir(userDir); // Use async readdir
+        const imageUrls = files
+          .filter((file) => file.startsWith("img"))
+          .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+        const extraimageUrls = files
+          .filter((file) => file.startsWith("extraImages"))
+          .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+
+        return {
+          ...booking,
+          cardetails:{...booking.cardetails, imageUrls, extraimageUrls},  // Add image URLs to cardetails
+        };
+      } catch (error) {
+        console.error("Error getting images for car:", car.car_no, error);
+        return {
+          ...booking,
+          cardetails:{...booking.cardetails, imageUrls: [], extraimageUrls: []}, // Handle errors gracefully
+        };
+      }
+    })
+  );
+  res.send(bookingsWithCarImages);
+  } catch(error) {
+    console.error(error);
+  }
 })
-.catch((error) => {
-  console.error(error);
-});
-})  
 
 //PastBookings 
 app.post("/PastBookings",authenticate,async(req,res)=>{
-  const {sid}=req.body
-  PastBookingModel.aggregate([
-    {
-        $match:{
-            sid:sid
-        }
-    },
-    {
-      $lookup: {
-        from: 'userdetails',
-        localField: 'uid',
-        foreignField: 'uid',
-        as: 'userdetails',
-      },
-    },
-  
-    {
-      $lookup: {
-          from: "cardetails",
-          localField: "car_no",
-          foreignField: "car_no",
-          as: "cardetails"
-      }
-  },
+  const {sid}=req.body;
+  try {
+  const bookings = await PastBookingModel.aggregate([
   {
-      $unwind: "$cardetails"
-  },
-  {
-      $unwind: "$userdetails",
-    },
-    {
-        $project:{
-            _id:1,
-            'bookingDetails.sid': '$$ROOT.sid',
-            'bookingDetails.car_no': '$$ROOT.car_no',
-            'bookingDetails.uid': '$$ROOT.uid',
-            'bookingDetails.uid': '$$ROOT.uid',
-            'bookingDetails.start_date': '$$ROOT.start_date',
-            'bookingDetails.drop_date': '$$ROOT.drop_date',
-            'bookingDetails.amount': '$$ROOT.amount',
-            'userdetails.name': 1,
-            'userdetails.phone': 1,
-            'cardetails.name':1,
-            'cardetails.img':1,
-            'cardetails.fuel':1,
-            'cardetails.make':1,
-            'cardetails.model':1,
-            'cardetails.type':1,
-            'cardetails.location':1,
-            'cardetails.year':1,
-            'cardetails.price':1,
-        }
+    $match: {
+    sid: sid
     }
-  
-  ])
-  .then(result => {
-    res.send(result)
-  })
-  .catch(error => {
-    res.send({status:"Error"})
-  });
-  })
+  },
+  {
+    $lookup: {
+      from: 'userdetails',
+      localField: 'uid',
+      foreignField: 'uid',
+      as: 'userdetails',
+    },
+  },
+
+  {
+    $lookup: {
+        from: "cardetails",
+        localField: "car_no",
+        foreignField: "car_no",
+        as: "cardetails"
+    }
+  },
+  {
+    $unwind: "$cardetails"
+  },
+  {
+    $unwind: "$userdetails",
+  },
+  {
+    $project: {
+      _id: 1,
+      'bookingDetails.sid': '$$ROOT.sid',
+      'bookingDetails.uid': '$$ROOT.uid',
+      'bookingDetails.car_no': '$$ROOT.car_no',
+      'bookingDetails.sid': '$$ROOT.sid',
+      'bookingDetails.start_date': '$$ROOT.start_date',
+      'bookingDetails.drop_date': '$$ROOT.drop_date',
+      'bookingDetails.amount': '$$ROOT.amount',
+      'userdetails.name': 1,
+      'userdetails.phone': 1,
+      'cardetails.name':1,
+      'cardetails.img':1,
+      'cardetails.fuel':1,
+      'cardetails.make':1,
+      'cardetails.model':1,
+      'cardetails.type':1,
+      'cardetails.location':1,
+      'cardetails.year':1,
+      'cardetails.price':1,
+    },
+  },
+  ]);
+  const bookingsWithCarImages = await Promise.all(
+    bookings.map(async (booking) => {
+      const car = booking.bookingDetails; // Access the car details from the booking
+      const userDir = `uploads/${car.sid}/${car.car_no}`;
+
+      try {
+        const files = await fs.promises.readdir(userDir); // Use async readdir
+        const imageUrls = files
+          .filter((file) => file.startsWith("img"))
+          .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+        const extraimageUrls = files
+          .filter((file) => file.startsWith("extraImages"))
+          .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+
+        return {
+          ...booking,
+          cardetails:{...booking.cardetails, imageUrls, extraimageUrls},  // Add image URLs to cardetails
+        };
+      } catch (error) {
+        console.error("Error getting images for car:", car.car_no, error);
+        return {
+          ...booking,
+          cardetails:{...booking.cardetails, imageUrls: [], extraimageUrls: []}, // Handle errors gracefully
+        };
+      }
+    })
+  );
+  res.send(bookingsWithCarImages);
+  } catch(error) {
+    console.error(error);
+  }
+})
 
 
 //Select types
@@ -559,11 +762,24 @@ app.post('/ContactUs',authenticate,async(req,res)=>
   app.post('/findUserProfile',authenticate,async(req,res)=>{
     const {sid}=req.body
     const ProfileDetails=await SellerModel.findOne({sid})
-    res.send(ProfileDetails)
+    let ProfileDetailsWithImages;
+    const userDir = `uploads/images/${sid}`;
+    try {
+      const files = await fs.promises.readdir(userDir); // Key change: await here
+      const imageUrls = files
+        .filter((file) => file.startsWith("img"))
+        .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
+        ProfileDetailsWithImages = { ...ProfileDetails._doc, imageUrls}; // Use ...car._doc if needed
+    } catch (error) {
+      console.error("Error getting images for car:", car.car_no, error);
+      return { ...ProfileDetails._doc, imageUrls: [] };  // Provide extraimageUrls in error case
+    }
+
+    res.send(ProfileDetailsWithImages)
   })
 
   //UpdateProfileDetails
-  app.post('/UpdateProfileDetails',authenticate,async(req,res)=>
+  app.post('/UpdateProfileDetails',authenticate,carUploadStorage,async(req,res)=>
   {
     const {sid,name,gender,email,phone,location,address}=req.body
     if(gender==='' && address==='')
@@ -603,13 +819,61 @@ app.post('/ContactUs',authenticate,async(req,res)=>
   res.send({action:true})
 })
 
-//ForgotPassword
+
 app.post('/forgotPassword',async(req,res)=>
-{ 
-  const {Email,Password}=req.body
-  await SellerModel.updateOne({email:Email},{$set:{password:Password}})
-  res.send({action:true})
-})
+  {
+      try {
+        const {token,Password}=req.body
+        const decodedUid = Buffer.from(token, 'base64').toString('utf8');
+        const { salt, hash } = await hashPassword(Password);
+        await SellerModel.updateOne({sid:decodedUid},{$set:{password:hash, salt:salt}})
+        res.send({action:true})
+      } catch (error) {
+        console.log(error)
+        res.send({action:false})
+      }
+  })
+
+  app.post("/sendPasswordReset",async(req,res)=>{
+
+    const {email}=req.body
+    const {sid}=await SellerModel.findOne({email:email}).select({sid:1});
+  
+  
+    const encodedUid = Buffer.from(sid).toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  
+  
+    var mailOptions = {
+        from: 'balprao@gmail.com',
+        to: email,
+        subject: 'Password Reset Request',
+        html: `
+          <div>
+            <h1>Dear Customer,</h1>
+            <p>Click the following link to reset your password</p>
+            ${process.env.HOST_URL}/forgotPassword?token=${encodedUid},
+  
+            <p>Best regards,<br>
+            RentnRide<br>
+            balprao@gmail.com<br>
+          </div>
+        `,
+    };
+  
+    transporter.sendMail(mailOptions, function(error, info){
+        if (error) {
+          console.log(error);
+        } else {
+          console.log('Email sent: ' + info.response);
+        }
+    });
+  
+    res.send({action:true})
+  })
+
 
 //FindReviews
 app.post('/findReviews',authenticate,async(req,res)=>

@@ -4,7 +4,7 @@ import axios from "./api/axios";
 import { useDispatch } from "react-redux";
 
 //Firebase
-import auth from "./config/firebase";
+//import auth from "./config/firebase";
 
 //Slice
 import { SignInDetails, SignOutDetails } from "./Slice/userSlice";
@@ -32,17 +32,22 @@ const Container=({ children })=> {
     }
 
     useEffect(() => {
-        auth.onAuthStateChanged((user) => {
-        if (user) {
-            console.log("Logged")
-            FetchUserDetails(user.uid)
-        }
-        else {
-            console.log("Logged off")
-            setLoading(false);
-            dispatch(SignOutDetails())
-        }
-    })
+        const checkAuthStatus = async () => {
+            try {
+                const { data } = await axios.get('/check-auth-status'); 
+                if (data.isAuthenticated) {
+                    FetchUserDetails(data.user.sid)
+                } else {
+                    dispatch(SignOutDetails());
+                }
+            } catch (error) {
+                console.error("Authentication check failed:", error);
+                dispatch(SignOutDetails());
+            } finally {
+                setLoading(false);
+            }
+        };
+        checkAuthStatus();   
     }, []);
 
     if (loading) {

@@ -263,7 +263,6 @@ const CardType=(type)=>
 
 
     const handleSuccess = (paymentIntent) => {
-        console.log(paymentIntent);
         Setloading(true)
         const SubmitPayment = async() => {
             const {data} = await axios.post('/Payment',{
@@ -294,7 +293,7 @@ const CardType=(type)=>
             <div className="bg-gray-800 p-2">
                 <button onClick={Close}><LeftCircleFilled className="text-white text-4xl cursor-pointer" /></button>
             </div>
-            <div className="bg-cover bg-center bg-no-repeat h-[60vh] w-full" style={{ backgroundImage: `url(${singlecardetails.img})` }}>
+            <div className="bg-cover bg-center bg-no-repeat h-[60vh] w-full" style={{ backgroundImage: `url(${singlecardetails.imageUrls})` }}>
                 <div className="bg-black/50 w-full h-full z-10 flex flex-col items-center pt-10">
                     <h2 className="text-white text-4xl md:text-5xl lg:text-6xl text-center mx-auto mb-4">Payment Details</h2>
                     <ConfigProvider
@@ -414,7 +413,7 @@ const CardType=(type)=>
                 <div className="p-4 border-t border-gray-200">
                     <div className="flex flex-col items-center">
                         <h2 className="text-lg font-bold">{singlecardetails.name}-{singlecardetails.year}</h2>
-                        <img src={singlecardetails.img} alt="CarImage" className='w-full h-auto' />
+                        <img src={singlecardetails.imageUrls} alt="CarImage" className='w-full h-auto' />
                     </div>
                 </div>
             </div>

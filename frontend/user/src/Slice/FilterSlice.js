@@ -5,7 +5,7 @@ export const FilterSlice=createSlice({
     initialState:
     {
         FilterAuth:'',
-        location:'',
+        Location:[],
         status:'FilterDetails',
         Fuel:[],
         Make:[],
@@ -31,7 +31,7 @@ export const FilterSlice=createSlice({
         },
         FillFilterOut(state,action)
         {
-            state.location=""
+            state.Location=[]
             state.Fuel=[]
             state.Make=[]
             state.Model=[]

@@ -1,9 +1,9 @@
 //Hooks Imports
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from '../api/axios';
-import { signInWithEmailAndPassword } from "firebase/auth";
-import auth from "../Config/firebase";
+//import { signInWithEmailAndPassword } from "firebase/auth";
+//import auth from "../Config/firebase";
 
 
 
@@ -30,6 +30,14 @@ const Login = () => {
             },
         });
     };
+
+    useEffect(() => {
+        if (sessionStorage.getItem('userAuth')) {
+            Navigate('/Dashboard');
+        } else {
+            Navigate('/');
+        }
+    }, []);
 
     const ValidateForm = () => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -71,9 +79,13 @@ const Login = () => {
 
 
         try {
-        const result = await signInWithEmailAndPassword(auth, formdata.email, formdata.password);
+        const email = formdata.email;
+        const password = formdata.password; 
+        const { data } = await axios.post("/login", {email, password});
+        if(data.uid){
             sessionStorage.setItem("userAuth", true);
             Navigate("/Dashboard");
+        }
 
         } catch(error) {
             openNotification("Invalid Details");

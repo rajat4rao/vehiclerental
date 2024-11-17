@@ -1,6 +1,6 @@
 //Firebase 
-import { signInWithEmailAndPassword } from "firebase/auth";
-import auth from "../config/firebase";
+//import { signInWithEmailAndPassword } from "firebase/auth";
+//import auth from "../config/firebase";
 
 //React 
 import { useEffect, useState } from "react";
@@ -80,8 +80,12 @@ const Login = () => {
 
     const LoginInDetails = async () => {
         try {
-            const result = await signInWithEmailAndPassword(auth, formdata.email, formdata.password);
-            FetchUserDetails(result.user.uid)
+            //const result = await signInWithEmailAndPassword(auth, formdata.email, formdata.password);
+            const email = formdata.email;
+            const password = formdata.password; 
+            const { data } = await axios.post("/login", {email, password});
+
+            FetchUserDetails(data.sid)
         } catch (error) {
             openNotification('Invalid Details')
         }
@@ -93,6 +97,7 @@ const Login = () => {
     }
 
     useEffect(() => {
+        console.log(user)
         if (user.isAuth) {
             Navigate('/Dashboard')
         }

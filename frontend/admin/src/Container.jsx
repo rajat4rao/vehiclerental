@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { SignInDetails, SignOutDetails } from "./Slice/userSlice";
 
 //Firebase
-import auth from "./Config/firebase";
+//import auth from "./Config/firebase";
 //Modules
 import Loading from './Loading/Loading'
 
@@ -31,21 +31,24 @@ const Container=({ children })=> {
             
 
     }
-    useEffect(() => {
-        
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                console.log("Logged")
-                FetchUserDetails(user.uid)
-
-
-            }
-            else {
-                console.log("Logged off")
+    useEffect(() => {  
+        const checkAuthStatus = async () => {
+            try {
+                const { data } = await axios.get('/check-auth-status'); 
+    
+                if (data.isAuthenticated) {
+                    FetchUserDetails(data.user.uid)
+                } else {
+                    dispatch(SignOutDetails());
+                }
+            } catch (error) {
+                console.error("Authentication check failed:", error);
+                dispatch(SignOutDetails());
+            } finally {
                 setLoading(false);
-                dispatch(SignOutDetails())
             }
-        })
+        };
+        checkAuthStatus();
     }, []);
 
     if (loading) {

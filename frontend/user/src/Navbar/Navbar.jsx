@@ -1,6 +1,7 @@
 //Firebase 
-import auth from "../config/firebase";
-import { signOut } from "firebase/auth";
+//import auth from "../config/firebase";
+//import { signOut } from "firebase/auth";
+import axios from "../api/axios";
 
 //Slice
 import { SignOutDetails } from "../Slice/userSlice";
@@ -23,8 +24,8 @@ const Navbar = () => {
         return location.pathname === path;
     };
 
-    const Logout = () => {
-        signOut(auth);
+    const Logout = async () => {
+        await axios.post('/logout'); 
         dispatch(SignOutDetails())
         navigate("/")
     }

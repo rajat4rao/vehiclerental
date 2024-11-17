@@ -369,7 +369,7 @@ const ViewBooking = () => {
                     <Modal centered open={ViewMore} footer={null} closeIcon={false} width={1000} >
                         <div className="flex flex-row p-2">
                             <div className="w-1/2 p-2 shadow-[rgba(50,50,93,0.25)_0px_4px_10px_2px] rounded-md">
-                                {ViewMore && <img src={fullsingledetails.cardetails.img} alt="CarImage" className="w-full h-full shadow-[0_0_10px_3px_rgba(0,0,0,0.1)] rounded-md" />}
+                                {ViewMore && <img src={fullsingledetails.cardetails.imageUrls} alt="CarImage" className="w-full h-full shadow-[0_0_10px_3px_rgba(0,0,0,0.1)] rounded-md" />}
                             </div>
 
                             <div className="w-1/2 ml-4 flex flex-col">
@@ -463,7 +463,7 @@ const ViewBooking = () => {
                                     return (
                                         <div className="bg-white w-[80%] m-2 p-1 flex flex-row shadow-[0_0_10px_3px_rgba(0,0,0,0.1)] rounded-md" key={data._id} >
                                             <div className="w-1/2 p-4 bg-white">
-                                                <img src={data.cardetails.img} alt="" className="w-full h-full" />
+                                                <img src={data.cardetails.imageUrls} alt="" className="w-full h-full" />
                                             </div>
                                             <div className="w-1/2 p-4 bg-white flex flex-col">
                                                 <div className="text-xl">
