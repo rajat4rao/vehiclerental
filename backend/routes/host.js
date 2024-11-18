@@ -1,7 +1,6 @@
 const express = require('express');
 const app = express.Router();
 
-//Firebase
 const firebase = require('../firebase');
 const { getAuth } = require('firebase-admin/auth');
 const { async } = require('@firebase/util');
@@ -18,11 +17,10 @@ const path = require("path");
 const util = require('util');  
 const rmdirAsync = util.promisify(fs.rm);
 const unlinkAsync = util.promisify(fs.unlink);
-app.use(express.urlencoded({ extended: true })); // For URL-encoded forms
+app.use(express.urlencoded({ extended: true })); 
 
 require('dotenv').config();
 
-//Models
 const {CarModel} =require("../Models/CarModel")
 const {SellerModel} = require('../Models/SellerModel')
 const {BookingModel}=require("../Models/BookingModel")
@@ -35,12 +33,11 @@ const authenticateold = require('../middleware/authenticate');
 const authenticate = require('../middleware/authenticatejwt');
 const carUploadStorage = require('../middleware/multer'); 
 
-//Functions
 const xlsx=require('xlsx');
 const {transporter}=require('../Mailer/Mail')
 
 async function hashPassword(password) {
-  const saltRounds = 10; // Number of salt rounds (higher is more secure, but slower) – 10-12 is a good range.
+  const saltRounds = 10; 
   const salt = await bcrypt.genSalt(saltRounds);
   const hash = await bcrypt.hash(password, salt);
   return { salt, hash };
@@ -56,8 +53,6 @@ function generateRandomAlphanumericSecure(length) {
   return result;
 }
 
-//Create New user
-
   app.post("/CreateUser",async(req,res)=>
   {
     const {name,email,password,phone,location}=req.body
@@ -71,7 +66,7 @@ function generateRandomAlphanumericSecure(length) {
       else
       {
         const { salt, hash } = await hashPassword(password);
-        //const acc = await auth.createUser({email,password});
+
         const sid = generateRandomAlphanumericSecure(30);
         await SellerModel.insertMany({sid:String(sid),name:name.charAt(0).toUpperCase()+name.slice(1),email:email,password:hash,salt:salt,phone:phone,location:location.charAt(0).toUpperCase()+location.slice(1),gender:'',address:''})
         res.send({status:"Profile Created Successfully",action:true})  
@@ -83,7 +78,6 @@ function generateRandomAlphanumericSecure(length) {
     }
   })
 
-
   async function checkPassword(password, storedHash) {
     try {
         const match = await bcrypt.compare(password, storedHash);
@@ -93,7 +87,7 @@ function generateRandomAlphanumericSecure(length) {
         return false; 
     }
   }
-  
+
   app.post('/login', async (req, res) => { 
     const { email, password } = req.body;  
     const user=await SellerModel.findOne({email:email}).select({password:1,email:1,sid:1})
@@ -101,20 +95,18 @@ function generateRandomAlphanumericSecure(length) {
       return res.status(401).json({ error: 'Invalid Credentials' });
     }
     const passwordMatches = await checkPassword(password, user.password);
-  
+
     if (passwordMatches) {
         const payload = { sid: user.sid, email: user.email, host:true };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
-  
-  
+
         res.cookie('jwt', token, { 
           httpOnly: true,  
           maxAge: 360000000, 
           sameSite: 'none',  
           secure: true 
       });
-  
-  
+
         const response = {sid: user.sid}
         res.json(response);
     } else {
@@ -122,18 +114,14 @@ function generateRandomAlphanumericSecure(length) {
     }
   });
 
-
-  app.get('/check-auth-status', authenticate, (req, res) => {  // Using the auth middleware
+  app.get('/check-auth-status', authenticate, (req, res) => {  
     if(req.user.host){
       res.json({ isAuthenticated: true, user: req.user });  
     } else {
       return res.status(401).json({ message: 'Unauthorized' });
     }
   });
-  
 
-
-// Login
 app.post("/findUser",authenticate,async(req,res)=>{
     const {sid}=req.body
     try
@@ -147,10 +135,9 @@ app.post("/findUser",authenticate,async(req,res)=>{
     }
 })
 
-//Add cars
 app.post("/AddCars",authenticate,carUploadStorage,async(req,res)=>
 {
-  
+
     const { sid,car_no,img,name,year,fuel,make,model,type,price,location,desc}=req.body
     const data=await CarModel.find({car_no})
     if(data.length>0)
@@ -167,14 +154,14 @@ app.post("/AddCars",authenticate,carUploadStorage,async(req,res)=>
                         console.log("File deleted successfully:", filePath);
                     } catch (fileDeleteError) {
                         console.error("Error deleting file:", filePath, fileDeleteError);
-                        // Handle individual file deletion errors, perhaps log them
+
                     }
                 })
             );
           }
         } catch (deleteError) {
           console.error("Error deleting directory and files:", deleteError);
-          // Handle the error appropriately, maybe send an error response but don't block the main response.
+
         }
       res.send({status:"Car already registered",action:false})
     }
@@ -186,7 +173,6 @@ app.post("/AddCars",authenticate,carUploadStorage,async(req,res)=>
     }
 })
 
-//VerifiedCars
 app.post("/VerifiedCars", authenticate, async (req, res) => {
   const { sid } = req.body;
 
@@ -203,17 +189,17 @@ app.post("/VerifiedCars", authenticate, async (req, res) => {
       result.map(async (car) => {
         const userDir = `uploads/${car.sid}/${car.car_no}`;
         try {
-          const files = await fs.promises.readdir(userDir); // Key change: await here
+          const files = await fs.promises.readdir(userDir); 
           const imageUrls = files
             .filter((file) => file.startsWith("img"))
             .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
           const extraimageUrls = files
             .filter((file) => file.startsWith("extraImages"))
             .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
-          return { ...car, imageUrls, extraimageUrls }; // Use ...car._doc if needed
+          return { ...car, imageUrls, extraimageUrls }; 
         } catch (error) {
           console.error("Error getting images for car:", car.car_no, error);
-          return { ...car, imageUrls: [], extraimageUrls: [] };  // Provide extraimageUrls in error case
+          return { ...car, imageUrls: [], extraimageUrls: [] };  
         }
       })
     );
@@ -224,35 +210,6 @@ app.post("/VerifiedCars", authenticate, async (req, res) => {
     res.status(500).send({ error: "An error occurred" });
   }
 });
-
-//UnVerifiedCars
-// app.post("/UnVerifiedCars", authenticate,async (req, res) => {
-//   const { sid } = req.body;
-//   CarModel.aggregate([
-//     {
-//       $match:{
-//         $and:[
-//           {
-//             sid:sid
-//           },
-//           {
-//             isverified:false
-//           }
-//         ]
-//       }
-//     },
-//   ])
-//     .then((result) => {
-//       res.send(result)
-//   })
-//   .catch((error) => {
-//     console.error(error);
-//   });
-
-// });
-
-
-
 
 app.post("/UnVerifiedCars", authenticate, async (req, res) => {
   const { sid } = req.body;
@@ -283,7 +240,7 @@ app.post("/UnVerifiedCars", authenticate, async (req, res) => {
           return { ...car, imageUrls, extraimageUrls };
         } catch (error) {
           console.error("Error getting images for car:", car.car_no, error);
-          return { ...car, imageUrls: [] }; // Or a default image URL
+          return { ...car, imageUrls: [] }; 
         }
       })
     );
@@ -295,7 +252,6 @@ app.post("/UnVerifiedCars", authenticate, async (req, res) => {
   }
 });
 
-//EditCarDetails
 app.put("/EditCarDetails",authenticate,async(req,res)=>{
     const {car_no,price,location,list_start,list_drop}=req.body
     const bookingDetails=await BookingModel.find({car_no})
@@ -316,7 +272,6 @@ res.send({action:true})
     }
 })
 
-//DelteCarDetail
 app.delete("/DeleteCarDetail",authenticate,async(req,res)=>{
 const {car_no}=req.body;
 const bookingDetails=await BookingModel.find({car_no})
@@ -330,9 +285,7 @@ else
   res.send({status:"Success",action:true})
 }
 }) 
- 
 
-//ActiveBookings
 app.post("/ActiveBookings",authenticate,async(req,res)=>{
   const {sid}=req.body;
   try {
@@ -391,11 +344,11 @@ app.post("/ActiveBookings",authenticate,async(req,res)=>{
   ]).exec();
   const bookingsWithCarImages = await Promise.all(
     bookings.map(async (booking) => {
-      const car = booking.bookingDetails; // Access the car details from the booking
+      const car = booking.bookingDetails; 
       const userDir = `uploads/${car.sid}/${car.car_no}`;
 
       try {
-        const files = await fs.promises.readdir(userDir); // Use async readdir
+        const files = await fs.promises.readdir(userDir); 
         const imageUrls = files
           .filter((file) => file.startsWith("img"))
           .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
@@ -405,13 +358,13 @@ app.post("/ActiveBookings",authenticate,async(req,res)=>{
 
         return {
           ...booking,
-          cardetails:{...booking.cardetails, imageUrls, extraimageUrls},  // Add image URLs to cardetails
+          cardetails:{...booking.cardetails, imageUrls, extraimageUrls},  
         };
       } catch (error) {
         console.error("Error getting images for car:", car.car_no, error);
         return {
           ...booking,
-          cardetails:{...booking.cardetails, imageUrls: [], extraimageUrls: []}, // Handle errors gracefully
+          cardetails:{...booking.cardetails, imageUrls: [], extraimageUrls: []}, 
         };
       }
     })
@@ -422,7 +375,6 @@ app.post("/ActiveBookings",authenticate,async(req,res)=>{
   }
 })
 
-//PastBookings 
 app.post("/PastBookings",authenticate,async(req,res)=>{
   const {sid}=req.body;
   try {
@@ -481,11 +433,11 @@ app.post("/PastBookings",authenticate,async(req,res)=>{
   ]);
   const bookingsWithCarImages = await Promise.all(
     bookings.map(async (booking) => {
-      const car = booking.bookingDetails; // Access the car details from the booking
+      const car = booking.bookingDetails; 
       const userDir = `uploads/${car.sid}/${car.car_no}`;
 
       try {
-        const files = await fs.promises.readdir(userDir); // Use async readdir
+        const files = await fs.promises.readdir(userDir); 
         const imageUrls = files
           .filter((file) => file.startsWith("img"))
           .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
@@ -495,13 +447,13 @@ app.post("/PastBookings",authenticate,async(req,res)=>{
 
         return {
           ...booking,
-          cardetails:{...booking.cardetails, imageUrls, extraimageUrls},  // Add image URLs to cardetails
+          cardetails:{...booking.cardetails, imageUrls, extraimageUrls},  
         };
       } catch (error) {
         console.error("Error getting images for car:", car.car_no, error);
         return {
           ...booking,
-          cardetails:{...booking.cardetails, imageUrls: [], extraimageUrls: []}, // Handle errors gracefully
+          cardetails:{...booking.cardetails, imageUrls: [], extraimageUrls: []}, 
         };
       }
     })
@@ -512,15 +464,12 @@ app.post("/PastBookings",authenticate,async(req,res)=>{
   }
 })
 
-
-//Select types
 app.get("/InputDetails",authenticate,async(req,res)=>{
   const data=await CarMetaData.find({})
   res.json(data[0])
 
 })
 
-//BookingList
 app.post('/BookingList',authenticate,async(req,res)=>
 {
     const {sid}=req.body
@@ -615,7 +564,6 @@ app.post('/BookingList',authenticate,async(req,res)=>
     res.send(TotalBookings) 
 })
 
-//UserCarsCount
 app.post('/UserCarsCount',authenticate,async(req,res)=>
 {
   const {sid}=req.body
@@ -672,15 +620,13 @@ app.post('/UserCarsCount',authenticate,async(req,res)=>
   const ActiveCars=await BookingModel.find({sid:sid}).select({start_date:1,drop_date:1})
   var activeSumValue = Activesum[0] && Activesum[0].sum_val !== undefined ? Number(Activesum[0].sum_val) : 0;
   var pastSumValue = Pastsum[0] && Pastsum[0].sum_val !== undefined ? Number(Pastsum[0].sum_val) : 0;
-  
-  var TotalSum = activeSumValue + pastSumValue;
-  
-  res.send({carcount:carcount,verifycarcount:verifycarcount,TotalSum:TotalSum,ActiveCars:ActiveCars.length})
 
+  var TotalSum = activeSumValue + pastSumValue;
+
+  res.send({carcount:carcount,verifycarcount:verifycarcount,TotalSum:TotalSum,ActiveCars:ActiveCars.length})
 
 })
 
-//CancelTrip
 app.post('/CancelTrip',authenticate,async(req,res)=>
 {
     const {sid,uid,car_no,start_date,drop_date,amount}=req.body
@@ -723,32 +669,27 @@ app.post('/CancelTrip',authenticate,async(req,res)=>
     {
       res.send({status:'The Customer Trip has been cancelled',action:true})
     }
- 
+
 })
 
-
-
-//FindNameandEmail
 app.post('/FindNameandEmail',async(req,res)=>{
   const {sid}=req.body
   const detail=await SellerModel.findOne({sid:sid}).select({name:1,email:1})
   res.send(detail)
 })
 
-//Contact
-
 app.post('/ContactUs',authenticate,async(req,res)=>
 {   
     const {sid,Message}=req.body
     const {email}=await SellerModel.findOne({sid:sid}).select({email:1})
-  
+
     var mailOptions = {
         from: email,
         to:'balprao@gmail.com' ,
         subject: 'Priority Support Request',
         text:Message
       };
-      
+
       transporter.sendMail(mailOptions, function(error, info){
         if (error) {
           console.log(error);
@@ -759,27 +700,23 @@ app.post('/ContactUs',authenticate,async(req,res)=>
     res.send({action:true})
 })
 
-//findUserProfile
   app.post('/findUserProfile',authenticate,async(req,res)=>{
     const {sid}=req.body
     const ProfileDetails=await SellerModel.findOne({sid})
     let ProfileDetailsWithImages;
     const userDir = `uploads/images/${sid}`;
     try {
-      const files = await fs.promises.readdir(userDir); // Key change: await here
+      const files = await fs.promises.readdir(userDir); 
       const imageUrls = files
         .filter((file) => file.startsWith("img"))
         .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
-        ProfileDetailsWithImages = { ...ProfileDetails._doc, imageUrls}; // Use ...car._doc if needed
+        ProfileDetailsWithImages = { ...ProfileDetails._doc, imageUrls}; 
     } catch (error) {
-      console.error("Error getting images for car:", car.car_no, error);
-      return { ...ProfileDetails._doc, imageUrls: [] };  // Provide extraimageUrls in error case
-    }
+      return { ...ProfileDetails._doc, imageUrls: [] };  
 
     res.send(ProfileDetailsWithImages)
   })
 
-  //UpdateProfileDetails
   app.post('/UpdateProfileDetails',authenticate,carUploadStorage,async(req,res)=>
   {
     const {sid,name,gender,email,phone,location,address}=req.body
@@ -807,7 +744,7 @@ app.post('/ContactUs',authenticate,async(req,res)=>
         phone:phone,
         address:address
     }})
-        
+
     }
     else  
     {await SellerModel.updateOne({sid:sid},{$set:{
@@ -819,7 +756,6 @@ app.post('/ContactUs',authenticate,async(req,res)=>
 }
   res.send({action:true})
 })
-
 
 app.post('/forgotPassword',async(req,res)=>
   {
@@ -839,14 +775,12 @@ app.post('/forgotPassword',async(req,res)=>
 
     const {email}=req.body
     const {sid}=await SellerModel.findOne({email:email}).select({sid:1});
-  
-  
+
     const encodedUid = Buffer.from(sid).toString('base64')
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
-  
-  
+
     var mailOptions = {
         from: 'balprao@gmail.com',
         to: email,
@@ -856,14 +790,14 @@ app.post('/forgotPassword',async(req,res)=>
             <h1>Dear Customer,</h1>
             <p>Click the following link to reset your password</p>
             ${process.env.HOST_URL}/forgotPassword?token=${encodedUid},
-  
+
             <p>Best regards,<br>
             RentnRide<br>
             balprao@gmail.com<br>
           </div>
         `,
     };
-  
+
     transporter.sendMail(mailOptions, function(error, info){
         if (error) {
           console.log(error);
@@ -871,12 +805,10 @@ app.post('/forgotPassword',async(req,res)=>
           console.log('Email sent: ' + info.response);
         }
     });
-  
+
     res.send({action:true})
   })
 
-
-//FindReviews
 app.post('/findReviews',authenticate,async(req,res)=>
 {
   const {car_no}=req.body
@@ -891,7 +823,6 @@ app.post('/findReviews',authenticate,async(req,res)=>
   }
 })
 
-//Bookings each month
 app.post('/BookingsPerMonth',authenticate,async(req,res)=>
 {
   const {sid}=req.body
@@ -899,6 +830,5 @@ app.post('/BookingsPerMonth',authenticate,async(req,res)=>
   const PastBooking=await PastBookingModel.find({sid:sid}).count()
   res.send({PastBooking,ActiveBookings})
 })
-
 
 module.exports = app;
