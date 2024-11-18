@@ -715,7 +715,7 @@ app.post('/ContactUs',authenticate,async(req,res)=>
       return { ...ProfileDetails._doc, imageUrls: [] };  
 
     res.send(ProfileDetailsWithImages)
-  })
+  }})
 
   app.post('/UpdateProfileDetails',authenticate,carUploadStorage,async(req,res)=>
   {
