@@ -113,7 +113,8 @@ app.post('/login', async (req, res) => {
           httpOnly: true,  
           maxAge: 360000000, 
           sameSite: 'none',  
-          secure: true 
+          secure: true,
+          domain: 'rentnride-admin.netlify.app' 
       });
         const response = {uid: user.uid}
         res.json(response);

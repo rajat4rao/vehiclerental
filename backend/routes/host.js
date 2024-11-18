@@ -104,7 +104,8 @@ function generateRandomAlphanumericSecure(length) {
           httpOnly: true,  
           maxAge: 360000000, 
           sameSite: 'none',  
-          secure: true 
+          secure: true,
+          domain: 'rentnride-host.netlify.app'
       });
 
         const response = {sid: user.sid}
