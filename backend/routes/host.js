@@ -711,8 +711,9 @@ app.post('/ContactUs',authenticate,async(req,res)=>
         .filter((file) => file.startsWith("img"))
         .map((file) => `${process.env.BASE_URL}/${userDir}/${file}`);
         ProfileDetailsWithImages = { ...ProfileDetails._doc, imageUrls}; 
+        res.send(ProfileDetailsWithImages)
     } catch (error) {
-      return { ...ProfileDetails._doc, imageUrls: [] };  
+      ProfileDetailsWithImages = { ...ProfileDetails._doc, imageUrls: [] };  
 
     res.send(ProfileDetailsWithImages)
   }})
