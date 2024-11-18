@@ -20,7 +20,7 @@ const {UserModel} = require('../Models/UserModel');
 const {ContactMessage} = require('../Models/ContactMessage');
 const {PaymentHistory} = require('../Models/PaymentHistory');
 const authenticateold = require('../middleware/authenticate'); 
-const authenticate = require('../middleware/authenticatejwt');
+const authenticate = require('../middleware/authenticatejwtadmin');
 const carUploadStorage = require('../middleware/multer'); 
 
 const {transporter}=require('../Mailer/Mail')
@@ -109,12 +109,11 @@ app.post('/login', async (req, res) => {
         const payload = { uid: user.uid, email: user.email, admin:true };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 
-        res.cookie('jwt', token, { 
+        res.cookie('jwt_admin', token, { 
           httpOnly: true,  
           maxAge: 360000000, 
           sameSite: 'none',  
           secure: true,
-          domain: 'rentnride-admin.netlify.app' 
       });
         const response = {uid: user.uid}
         res.json(response);
@@ -124,7 +123,7 @@ app.post('/login', async (req, res) => {
   });
 
   app.post('/logout', authenticate, (req, res) => {
-    res.clearCookie('jwt', { 
+    res.clearCookie('jwt_admin', { 
         httpOnly: true,  
     });
 

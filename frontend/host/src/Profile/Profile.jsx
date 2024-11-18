@@ -45,8 +45,9 @@ const Profile = () => {
   const filterOption = (input, option) =>
     (option?.label ?? "").toLowerCase().includes(input.toLowerCase());
 
-  const Logout = () => {
+  const Logout = async () => {
     //signOut(auth);
+    await axios.post('/logout');
     dispatch(SignOutDetails());
     Navigate("/");
   };

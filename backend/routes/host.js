@@ -30,7 +30,7 @@ const { ReviewModel } = require('../Models/ReviewModel');
 const {UserModel}=require('../Models/UserModel')
 const {DescriptionModel}=require('../Models/CarDescription')
 const authenticateold = require('../middleware/authenticate'); 
-const authenticate = require('../middleware/authenticatejwt');
+const authenticate = require('../middleware/authenticatejwthost');
 const carUploadStorage = require('../middleware/multer'); 
 
 const xlsx=require('xlsx');
@@ -100,12 +100,11 @@ function generateRandomAlphanumericSecure(length) {
         const payload = { sid: user.sid, email: user.email, host:true };
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 
-        res.cookie('jwt', token, { 
+        res.cookie('jwt_host', token, { 
           httpOnly: true,  
           maxAge: 360000000, 
           sameSite: 'none',  
           secure: true,
-          domain: 'rentnride-host.netlify.app'
       });
 
         const response = {sid: user.sid}
@@ -121,6 +120,14 @@ function generateRandomAlphanumericSecure(length) {
     } else {
       return res.status(401).json({ message: 'Unauthorized' });
     }
+  });
+
+  app.post('/logout', authenticate, (req, res) => {
+    res.clearCookie('jwt_host', { 
+        httpOnly: true,  
+    });
+  
+    res.sendStatus(200); 
   });
 
 app.post("/findUser",authenticate,async(req,res)=>{
