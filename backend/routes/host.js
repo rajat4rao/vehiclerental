@@ -124,7 +124,9 @@ function generateRandomAlphanumericSecure(length) {
 
   app.post('/logout', authenticate, (req, res) => {
     res.clearCookie('jwt_host', { 
-        httpOnly: true,  
+        httpOnly: true,
+        sameSite: 'none',
+        secure: true  
     });
   
     res.sendStatus(200); 

@@ -117,7 +117,9 @@ app.post('/login', async (req, res) => {
 
 app.post('/logout', authenticate, (req, res) => {
   res.clearCookie('jwt_user', { 
-      httpOnly: true,  
+      httpOnly: true,
+      sameSite: 'none',
+      secure: true    
   });
 
   res.sendStatus(200); 
