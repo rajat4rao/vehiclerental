@@ -37,7 +37,7 @@ const Contact = () => {
     }, [])
 
     const handleChange = (e) => {
-        SetMessage((prev) => ({ ...prev, [e.target.name]: e.target.value.trim() }))
+        SetMessage((prev) => ({ ...prev, [e.target.name]: e.target.value }))
     }
 
     const ValidateForm = () => {
